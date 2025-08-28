@@ -1,119 +1,56 @@
-/* Footer.jsx */
 import { Link } from "react-router";
-import { FaFacebookF, FaInstagram, FaWhatsapp } from "react-icons/fa";
+import {
+  FaFacebookF,
+  FaInstagram,
+  FaWhatsapp,
+  FaMapMarkerAlt,
+  FaPhoneAlt,
+  FaEnvelope,
+} from "react-icons/fa";
 
 const Footer = () => {
   return (
-    <footer className="bg-brand-neutral-900 text-brand-neutral-100">
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:py-16">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-          {/* Brand Info */}
+    <footer className="relative bg-gradient-to-b from-green-50 via-green-100 to-green-50 text-gray-800">
+      {/* Top CTA band */}
+      <div className="border-b border-green-200">
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:py-10 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div>
-            <h2 className="font-heading text-xl text-white">পল্লী আহার</h2>
-            <p className="font-body mt-3 text-sm text-brand-neutral-300 leading-6">
+            <h2 className="noto-serif-bengali-normal text-2xl">
+              আমাদের ফেসবুক পরিবারে যোগ দিন
+            </h2>
+            <p className="hind-siliguri-regular mt-1 text-sm text-gray-600">
+              নতুন অফার ও আপডেট জানতে আমাদের ফলো করুন।
+            </p>
+          </div>
+          <a
+            href="https://facebook.com"
+            target="_blank"
+            rel="noreferrer"
+            className="hind-siliguri-semibold inline-flex items-center gap-2 rounded-xl bg-green-600 px-5 py-3 text-white text-sm hover:bg-green-700 transition"
+          >
+            <FaFacebookF /> ফেসবুক পেজ ফলো করুন
+          </a>
+        </div>
+      </div>
+
+      {/* Main footer */}
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:py-16">
+        <div className="grid grid-cols-1 gap-8 sm:grid-cols-3">
+          {/* Brand / About */}
+          <div>
+            <h2 className="noto-serif-bengali-normal text-xl">পল্লী আহার</h2>
+            <p className="hind-siliguri-regular mt-3 text-sm leading-7 text-gray-700">
               খাঁটি মধু, দেশি চাল, ঘি ও মশলা—গ্রামীণ স্বাদের আসল ঠিকানা। বিশুদ্ধ
               ও নিরাপদ খাদ্য, সারা দেশে ডেলিভারি।
             </p>
-          </div>
-
-          {/* Navigation */}
-          <div>
-            <h3 className="font-heading text-lg text-white">নেভিগেশন</h3>
-            <ul className="mt-3 space-y-2 font-body text-sm">
-              <li>
-                <Link to="/shop" className="hover:text-brand-accent transition">
-                  পণ্যসমূহ
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/about"
-                  className="hover:text-brand-accent transition"
-                >
-                  আমাদের সম্পর্কে
-                </Link>
-              </li>
-              <li>
-                <Link to="/blog" className="hover:text-brand-accent transition">
-                  ব্লগ
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/contact"
-                  className="hover:text-brand-accent transition"
-                >
-                  যোগাযোগ
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Customer Care */}
-          <div>
-            <h3 className="font-heading text-lg text-white">কাস্টমার কেয়ার</h3>
-            <ul className="mt-3 space-y-2 font-body text-sm">
-              <li>
-                <Link to="/faq" className="hover:text-brand-accent transition">
-                  সাধারণ জিজ্ঞাসা
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/returns"
-                  className="hover:text-brand-accent transition"
-                >
-                  রিটার্ন নীতি
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/shipping"
-                  className="hover:text-brand-accent transition"
-                >
-                  ডেলিভারি তথ্য
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/terms"
-                  className="hover:text-brand-accent transition"
-                >
-                  শর্তাবলী
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Contact & Social */}
-          <div>
-            <h3 className="font-heading text-lg text-white">যোগাযোগ</h3>
-            <p className="font-body mt-3 text-sm text-brand-neutral-300">
-              দোকান নং ১, দস্ত মোহাম্মদ বিল্ডিং, ৫৩/এ কাজেম আলী বাই লেন,
-              খলিফাপট্টি, চট্টগ্রাম
-            </p>
-            <p className="font-body mt-2 text-sm">
-              📞{" "}
-              <a href="tel:+8801887640827" className="hover:text-brand-accent">
-                +880 1887-640827
-              </a>
-            </p>
-            <p className="font-body text-sm">
-              ✉️{" "}
-              <a
-                href="mailto:info@polliahar.com"
-                className="hover:text-brand-accent"
-              >
-                info@polliahar.com
-              </a>
-            </p>
-
-            <div className="mt-4 flex gap-4 text-lg">
+            {/* Social */}
+            <div className="mt-4 flex items-center gap-3">
               <a
                 href="https://facebook.com"
                 target="_blank"
                 rel="noreferrer"
-                className="hover:text-brand-accent"
+                className="group inline-flex h-9 w-9 items-center justify-center rounded-full border border-green-200 bg-white hover:bg-green-600 hover:text-white transition"
+                aria-label="Facebook"
               >
                 <FaFacebookF />
               </a>
@@ -121,7 +58,8 @@ const Footer = () => {
                 href="https://instagram.com"
                 target="_blank"
                 rel="noreferrer"
-                className="hover:text-brand-accent"
+                className="group inline-flex h-9 w-9 items-center justify-center rounded-full border border-green-200 bg-white hover:bg-green-600 hover:text-white transition"
+                aria-label="Instagram"
               >
                 <FaInstagram />
               </a>
@@ -129,17 +67,87 @@ const Footer = () => {
                 href="https://wa.me/8801887640827"
                 target="_blank"
                 rel="noreferrer"
-                className="hover:text-brand-accent"
+                className="group inline-flex h-9 w-9 items-center justify-center rounded-full border border-green-200 bg-white hover:bg-green-600 hover:text-white transition"
+                aria-label="WhatsApp"
               >
                 <FaWhatsapp />
               </a>
             </div>
           </div>
+
+          {/* Navigation */}
+          <div>
+            <h3 className="noto-serif-bengali-normal text-lg">নেভিগেশন</h3>
+            <ul className="mt-3 space-y-2">
+              <li>
+                <Link
+                  to="/"
+                  className="hind-siliguri-regular inline-block text-sm hover:text-green-700 transition"
+                >
+                  হোম
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/shop"
+                  className="hind-siliguri-regular inline-block text-sm hover:text-green-700 transition"
+                >
+                  পণ্যসমূহ
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/about"
+                  className="hind-siliguri-regular inline-block text-sm hover:text-green-700 transition"
+                >
+                  আমাদের সম্পর্কে
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/contact"
+                  className="hind-siliguri-regular inline-block text-sm hover:text-green-700 transition"
+                >
+                  যোগাযোগ
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Contact Info */}
+          <div>
+            <h3 className="noto-serif-bengali-normal text-lg">যোগাযোগ</h3>
+            <div className="mt-3 space-y-3 text-sm">
+              <p className="hind-siliguri-regular flex items-start gap-2 text-gray-700">
+                <FaMapMarkerAlt className="mt-1 text-green-700" />
+                দোকান নং ১, দস্ত মোহাম্মদ বিল্ডিং, ৫৩/এ কাজেম আলী বাই লেন,
+                খলিফাপট্টি, চট্টগ্রাম
+              </p>
+              <p className="hind-siliguri-regular flex items-center gap-2">
+                <FaPhoneAlt className="text-green-700" />
+                <a
+                  href="tel:+8801887640827"
+                  className="hover:text-green-700 transition"
+                >
+                  +880 1887-640827
+                </a>
+              </p>
+              <p className="hind-siliguri-regular flex items-center gap-2">
+                <FaEnvelope className="text-green-700" />
+                <a
+                  href="mailto:info@polliahar.com"
+                  className="hover:text-green-700 transition"
+                >
+                  info@polliahar.com
+                </a>
+              </p>
+            </div>
+          </div>
         </div>
 
-        {/* Divider */}
-        <div className="mt-10 border-t border-brand-border/20 pt-6 text-center">
-          <p className="font-body text-xs text-brand-neutral-400">
+        {/* Bottom bar */}
+        <div className="mt-10 border-t border-green-200 pt-6 text-center">
+          <p className="hind-siliguri-regular text-xs text-gray-600">
             © {new Date().getFullYear()} পল্লী আহার — সর্বস্বত্ব সংরক্ষিত।
           </p>
         </div>
