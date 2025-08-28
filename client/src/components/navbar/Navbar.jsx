@@ -7,6 +7,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import logo from "../../assets/logo.jpg";
 import useAuth from "../../hooks/useAuth";
+import toast from "react-hot-toast";
 
 const Navbar = ({ cartCount = 0 }) => {
   const { user, logOut } = useAuth();
@@ -20,6 +21,7 @@ const Navbar = ({ cartCount = 0 }) => {
   const onLogout = async () => {
     try {
       await logOut();
+      toast.success("আপনি সফলভাবে লগআউট করেছেন!");
       navigate("/");
     } finally {
       setDropdownOpen(false);
