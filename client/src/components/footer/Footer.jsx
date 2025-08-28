@@ -23,7 +23,7 @@ const Footer = () => {
             </p>
           </div>
           <a
-            href="https://facebook.com"
+            href="https://www.facebook.com/PalliAharChittagong"
             target="_blank"
             rel="noreferrer"
             className="hind-siliguri-semibold inline-flex items-center gap-2 rounded-xl bg-green-600 px-5 py-3 text-white text-sm hover:bg-green-700 transition"
@@ -46,7 +46,7 @@ const Footer = () => {
             {/* Social */}
             <div className="mt-4 flex items-center gap-3">
               <a
-                href="https://facebook.com"
+                href="https://www.facebook.com/PalliAharChittagong"
                 target="_blank"
                 rel="noreferrer"
                 className="group inline-flex h-9 w-9 items-center justify-center rounded-full border border-green-200 bg-white hover:bg-green-600 hover:text-white transition"
