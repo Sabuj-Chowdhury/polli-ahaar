@@ -166,7 +166,7 @@ const Navbar = ({ cartCount = 0 }) => {
                   </div>
                   <div className="border-t border-green-200" />
                   <NavLink
-                    to="/dashboard"
+                    to="/dashboard/profile"
                     className="block px-4 py-2 text-sm hover:bg-green-50 hind-siliguri-regular"
                     onClick={() => setDropdownOpen(false)}
                   >
@@ -263,7 +263,7 @@ const Navbar = ({ cartCount = 0 }) => {
           </div>
           <div className="border-t border-green-200" />
           <NavLink
-            to="/dashboard"
+            to="/dashboard/profile"
             className="block px-4 py-2 hover:bg-green-50 hind-siliguri-regular"
             onClick={() => {
               setDropdownOpen(false);
@@ -353,7 +353,7 @@ const Navbar = ({ cartCount = 0 }) => {
             <>
               <div className="my-2 mx-3 border-t border-green-200" />
               <NavLink
-                to="/dashboard"
+                to="/dashboard/profile"
                 className="px-3 py-3 rounded-md hover:bg-green-100 hover:text-green-700 transition"
                 onClick={() => setMenuOpen(false)}
               >

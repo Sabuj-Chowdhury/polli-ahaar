@@ -67,7 +67,7 @@ const SideBar = () => {
             )}
 
             <NavLink
-              to="/dashboard/add-camp"
+              to="/dashboard/add-product"
               className={({ isActive }) =>
                 `${baseItem} ${isActive ? activeItem : ""}`
               }
@@ -81,7 +81,7 @@ const SideBar = () => {
             </NavLink>
 
             <NavLink
-              to="/dashboard/manage-camps"
+              to="/dashboard/manage-products"
               className={({ isActive }) =>
                 `${baseItem} ${isActive ? activeItem : ""}`
               }

@@ -93,7 +93,7 @@ const AuthProvider = ({ children }) => {
     };
   }, [axiosPublic]);
 
-  console.log(user);
+  // console.log(user);
 
   // props
   const authInfo = {

@@ -7,6 +7,9 @@ import SignUp from "../pages/registration/SignUp";
 import PrivateRoute from "./PrivateRoute";
 import Dashboard from "../layouts/Dashboard";
 import Profile from "../pages/dashbooard/common/Profile";
+import AdminRoutes from "./AdminRoutes";
+import AddProduct from "../pages/dashbooard/admin/AddProduct";
+import ManageProducts from "../pages/dashbooard/admin/ManageProducts";
 
 const router = createBrowserRouter([
   {
@@ -39,14 +42,36 @@ const router = createBrowserRouter([
           </PrivateRoute>
         ),
       },
-      // {
-      //   path: "profile",
-      //   element: (
-      //     <PrivateRoute>
-      //       <Profile />
-      //     </PrivateRoute>
-      //   ),
-      // },
+
+      {
+        path: "profile",
+        element: (
+          <PrivateRoute>
+            <Profile />
+          </PrivateRoute>
+        ),
+      },
+      // ****ADMIN routes******
+      {
+        path: "add-product",
+        element: (
+          <PrivateRoute>
+            <AdminRoutes>
+              <AddProduct />
+            </AdminRoutes>
+          </PrivateRoute>
+        ),
+      },
+      {
+        path: "manage-products",
+        element: (
+          <PrivateRoute>
+            <AdminRoutes>
+              <ManageProducts />
+            </AdminRoutes>
+          </PrivateRoute>
+        ),
+      },
     ],
   },
 ]);
