@@ -1,8 +1,6 @@
-// src/pages/dashboard/products/ProductTable.jsx
 import { useState } from "react";
 import { FiEdit2, FiTrash2 } from "react-icons/fi";
 import Swal from "sweetalert2";
-import useAxiosSecure from "../../../hooks/useAxiosSecure";
 import LoadingSpinner from "../../../components/spinner/LoadingSpinner";
 
 const ProductTable = ({
@@ -11,25 +9,13 @@ const ProductTable = ({
   limit,
   computeMinPrice,
   totalStock,
-  refetch,
-  onEdit, // ✅ accept onEdit from parent
+  onEdit,
+  onDelete, // parent provides deletion (returns a Promise)
 }) => {
-  const axiosSecure = useAxiosSecure();
   const [deletingId, setDeletingId] = useState(null);
 
-  // Delete API call
-  const handleDelete = async (id) => {
-    try {
-      setDeletingId(id);
-      await axiosSecure.delete(`/product/${id}`);
-      await refetch?.();
-    } finally {
-      setDeletingId(null);
-    }
-  };
-
-  // SweetAlert wrapper
   const handleCustomDelete = (id) => {
+    // Ask confirm here (UI lives in table), then call parent onDelete
     Swal.fire({
       title: "Are you sure?",
       text: "You won't be able to revert this!",
@@ -39,21 +25,12 @@ const ProductTable = ({
       cancelButtonColor: "#d33",
       confirmButtonText: "Yes, delete it!",
     }).then(async (result) => {
-      if (result.isConfirmed) {
-        try {
-          await handleDelete(id);
-          Swal.fire({
-            title: "Deleted!",
-            text: "Product has been deleted.",
-            icon: "success",
-          });
-        } catch {
-          Swal.fire({
-            title: "Failed!",
-            text: "Delete failed. Try again.",
-            icon: "error",
-          });
-        }
+      if (!result.isConfirmed) return;
+      try {
+        setDeletingId(id);
+        await onDelete?.(id);
+      } finally {
+        setDeletingId(null);
       }
     });
   };

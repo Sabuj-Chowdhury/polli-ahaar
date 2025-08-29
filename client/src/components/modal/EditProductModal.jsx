@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import {
   CATEGORY_OPTIONS,
@@ -10,8 +11,9 @@ import {
 import { imageUpload } from "../../utils/imageBBApi";
 import useAxiosSecure from "../../hooks/useAxiosSecure";
 
-const EditProductModal = ({ product, isOpen, onClose, refetch }) => {
+const EditProductModal = ({ product, isOpen, onClose }) => {
   const axiosSecure = useAxiosSecure();
+  const queryClient = useQueryClient();
 
   const {
     register,
@@ -64,7 +66,7 @@ const EditProductModal = ({ product, isOpen, onClose, refetch }) => {
         imageFile: null,
       });
       setImagePreview(product.image || null);
-      setFileName(""); // reset filename display
+      setFileName("");
     }
   }, [product, isOpen, reset]);
 
@@ -74,30 +76,120 @@ const EditProductModal = ({ product, isOpen, onClose, refetch }) => {
     [selectedCategory]
   );
 
-  // Image handling
+  // -------- image preview (blob) ----------
   const [imagePreview, setImagePreview] = useState(null);
   const [fileName, setFileName] = useState("");
+  const lastBlobRef = useRef(null);
+
   const onImageChange = (e) => {
     const file = e.target.files?.[0];
-    setValue("imageFile", file);
+    setValue("imageFile", file || null);
     setFileName(file ? file.name : "");
-    setImagePreview(file ? URL.createObjectURL(file) : imagePreview);
+    if (file) {
+      const blobUrl = URL.createObjectURL(file);
+      if (lastBlobRef.current) URL.revokeObjectURL(lastBlobRef.current);
+      lastBlobRef.current = blobUrl;
+      setImagePreview(blobUrl);
+    } else {
+      setImagePreview(product?.image || null);
+    }
   };
+
+  useEffect(() => {
+    return () => {
+      if (lastBlobRef.current) {
+        URL.revokeObjectURL(lastBlobRef.current);
+        lastBlobRef.current = null;
+      }
+    };
+  }, []);
+
   const clearImage = () => {
     setValue("imageFile", null);
     setFileName("");
     setImagePreview(product?.image || null);
   };
 
+  // ---------- MUTATION (optimistic) ----------
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, payload }) => {
+      // PUT should return the updated product doc; if not, we’ll synthesize one
+      const { data } = await axiosSecure.put(`/product/${id}`, payload);
+      return data?.value || data || { _id: id, ...payload }; // support MongoDB findOneAndUpdate response or custom
+    },
+    onMutate: async ({ id, payload }) => {
+      // cancel all products-admin queries while we update cache
+      const queries = queryClient.getQueriesData({
+        queryKey: ["products-admin"],
+      });
+      await Promise.all(
+        queries.map(([key]) => queryClient.cancelQueries({ queryKey: key }))
+      );
+
+      // snapshot previous states for rollback
+      const snapshots = queries.map(([key, old]) => ({ key, old }));
+
+      // apply optimistic update across every cached page that has this product
+      queries.forEach(([key, old]) => {
+        if (!old?.items) return;
+        const items = old.items.map((p) =>
+          p._id === id
+            ? {
+                ...p,
+                ...payload,
+                // recompute minPrice to keep list sorting correct
+                minPrice: Array.isArray(payload.variants)
+                  ? Math.min(
+                      ...payload.variants.map(
+                        (v) => Number(v.price) || Infinity
+                      )
+                    )
+                  : p.minPrice,
+              }
+            : p
+        );
+        queryClient.setQueryData(key, { ...old, items });
+      });
+
+      return { snapshots };
+    },
+    onError: (_err, _vars, ctx) => {
+      // rollback to snapshots
+      ctx?.snapshots?.forEach(({ key, old }) => {
+        queryClient.setQueryData(key, old);
+      });
+      toast.error("পণ্য আপডেট ব্যর্থ হয়েছে।");
+    },
+    onSuccess: (updated) => {
+      // ensure caches have the canonical updated product (covers cases where server tweaked data)
+      const queries = queryClient.getQueriesData({
+        queryKey: ["products-admin"],
+      });
+      queries.forEach(([key, old]) => {
+        if (!old?.items) return;
+        const items = old.items.map((p) =>
+          p._id === updated._id ? updated : p
+        );
+        queryClient.setQueryData(key, { ...old, items });
+      });
+      toast.success("পণ্য সফলভাবে আপডেট হয়েছে!");
+    },
+    onSettled: () => {
+      // revalidate from server (current page + any others)
+      queryClient.invalidateQueries({ queryKey: ["products-admin"] });
+    },
+  });
+
   const onSubmit = async (data) => {
     try {
       let imageUrl = product.image;
       if (data.imageFile) {
-        imageUrl = await imageUpload(data.imageFile);
-        if (!imageUrl) {
+        const url = await imageUpload(data.imageFile);
+        if (!url) {
           toast.error("ছবি আপলোড ব্যর্থ হয়েছে।");
           return;
         }
+        imageUrl = url;
       }
 
       const variants = (data.variants || [])
@@ -128,10 +220,7 @@ const EditProductModal = ({ product, isOpen, onClose, refetch }) => {
         featured: !!data.featured,
       };
 
-      await axiosSecure.put(`/product/${product._id}`, payload);
-
-      toast.success("পণ্য সফলভাবে আপডেট হয়েছে!");
-      refetch?.();
+      await updateMutation.mutateAsync({ id: product._id, payload });
       onClose?.();
     } catch (err) {
       console.error(err);
@@ -256,19 +345,17 @@ const EditProductModal = ({ product, isOpen, onClose, refetch }) => {
             />
           </div>
 
-          {/* Image — BIG, CLEAR upload card */}
+          {/* Image */}
           <div>
             <label className="text-sm text-gray-700 block mb-1">
               পণ্যের ছবি
             </label>
 
-            {/* Clickable dropzone-style card */}
             <label
               htmlFor="editProductImage"
               className="flex cursor-pointer items-center gap-4 rounded-xl border border-dashed border-green-400 bg-green-50/40 p-4 hover:bg-green-50 transition"
             >
               <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-100">
-                {/* camera icon */}
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   className="h-6 w-6 text-green-700"
@@ -300,7 +387,6 @@ const EditProductModal = ({ product, isOpen, onClose, refetch }) => {
               </span>
             </label>
 
-            {/* Hidden native input */}
             <input
               id="editProductImage"
               type="file"
@@ -309,7 +395,6 @@ const EditProductModal = ({ product, isOpen, onClose, refetch }) => {
               className="sr-only"
             />
 
-            {/* Preview + actions */}
             {imagePreview && (
               <div className="mt-3 flex items-center gap-4">
                 <img
@@ -453,10 +538,12 @@ const EditProductModal = ({ product, isOpen, onClose, refetch }) => {
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || updateMutation.isLoading}
               className="px-4 py-2 bg-green-600 text-white rounded disabled:opacity-60"
             >
-              {isSubmitting ? "আপডেট হচ্ছে…" : "আপডেট করুন"}
+              {isSubmitting || updateMutation.isLoading
+                ? "আপডেট হচ্ছে…"
+                : "আপডেট করুন"}
             </button>
           </div>
         </form>

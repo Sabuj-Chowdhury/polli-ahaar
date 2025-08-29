@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Swal from "sweetalert2";
 import useAxiosPublic from "../../../hooks/useAxiosPublic";
 import useAxiosSecure from "../../../hooks/useAxiosSecure";
@@ -41,6 +41,7 @@ const UNIT_OPTIONS = ["", "গ্রাম", "কেজি", "লিটার", 
 const ManageProducts = () => {
   const axiosPublic = useAxiosPublic();
   const axiosSecure = useAxiosSecure();
+  const queryClient = useQueryClient();
 
   // Live filters
   const [filters, setFilters] = useState({
@@ -95,15 +96,81 @@ const ManageProducts = () => {
     return p;
   }, [applied]);
 
-  // Query products
-  const { data, isLoading, refetch } = useQuery({
+  // Query products — include params in key for correct caching
+  const { data, isLoading } = useQuery({
     queryKey: ["products-admin", params],
     queryFn: async () => {
       const { data } = await axiosPublic.get("/products", { params });
       return data; // { total, page, limit, pages, items }
     },
     keepPreviousData: true,
+    staleTime: 0,
   });
+
+  // --- Delete mutation (optimistic) ---
+  const deleteMutation = useMutation({
+    mutationFn: (id) => axiosSecure.delete(`/product/${id}`),
+    onMutate: async (id) => {
+      // cancel outgoing fetches for this list
+      await queryClient.cancelQueries({ queryKey: ["products-admin", params] });
+      // snapshot previous
+      const prev = queryClient.getQueryData(["products-admin", params]);
+
+      // optimistic remove
+      queryClient.setQueryData(["products-admin", params], (old) => {
+        if (!old) return old;
+        const nextItems = (old.items || []).filter((p) => p._id !== id);
+        const nextTotal = Math.max(0, (old.total || 0) - 1);
+        return { ...old, items: nextItems, total: nextTotal };
+      });
+
+      return { prev };
+    },
+    onError: (_err, _id, ctx) => {
+      // rollback
+      if (ctx?.prev) {
+        queryClient.setQueryData(["products-admin", params], ctx.prev);
+      }
+    },
+    onSettled: () => {
+      // revalidate from server
+      queryClient.invalidateQueries({ queryKey: ["products-admin", params] });
+    },
+  });
+
+  // Delete with confirm (returns a Promise so table can show per-row loading)
+  const handleCustomDelete = (id) =>
+    new Promise((resolve, reject) => {
+      Swal.fire({
+        title: "Are you sure?",
+        text: "You won't be able to revert this!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#3085d6",
+        cancelButtonColor: "#d33",
+        confirmButtonText: "Yes, delete it!",
+      }).then((result) => {
+        if (!result.isConfirmed) return reject(new Error("cancelled"));
+        deleteMutation
+          .mutateAsync(id)
+          .then(() => {
+            Swal.fire({
+              title: "Deleted!",
+              text: "Product has been deleted.",
+              icon: "success",
+            });
+            resolve();
+          })
+          .catch(() => {
+            Swal.fire({
+              title: "Failed!",
+              text: "Delete failed. Try again.",
+              icon: "error",
+            });
+            reject(new Error("failed"));
+          });
+      });
+    });
 
   const items = data?.items || [];
   const total = data?.total || 0;
@@ -137,42 +204,6 @@ const ManageProducts = () => {
 
   const onEnterApply = (e) => {
     if (e.key === "Enter") handleApply();
-  };
-
-  // DELETE (with SweetAlert2)
-  const handleDelete = async (id) => {
-    await axiosSecure.delete(`/product/${id}`);
-    await refetch();
-  };
-
-  const handleCustomDelete = (id) => {
-    Swal.fire({
-      title: "Are you sure?",
-      text: "You won't be able to revert this!",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#3085d6",
-      cancelButtonColor: "#d33",
-      confirmButtonText: "Yes, delete it!",
-    }).then((result) => {
-      if (result.isConfirmed) {
-        handleDelete(id)
-          .then(() => {
-            Swal.fire({
-              title: "Deleted!",
-              text: "Product has been deleted.",
-              icon: "success",
-            });
-          })
-          .catch(() => {
-            Swal.fire({
-              title: "Failed!",
-              text: "Delete failed. Try again.",
-              icon: "error",
-            });
-          });
-      }
-    });
   };
 
   // Helpers for table
@@ -357,8 +388,8 @@ const ManageProducts = () => {
         limit={applied.limit}
         computeMinPrice={computeMinPrice}
         totalStock={totalStock}
-        onEdit={openEdit} // 👈 open modal with selected product
-        onDelete={handleCustomDelete} // 👈 sweetalert2 delete flow
+        onEdit={openEdit}
+        onDelete={handleCustomDelete} // parent handles delete + cache
       />
 
       {/* Pagination */}
@@ -376,12 +407,11 @@ const ManageProducts = () => {
         />
       )}
 
-      {/* Edit Modal (render once at page root) */}
+      {/* Edit Modal */}
       <EditProductModal
         product={selectedProduct}
         isOpen={isEditOpen}
         onClose={closeEdit}
-        refetch={refetch}
       />
     </div>
   );

@@ -1,27 +1,50 @@
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import { TbFidgetSpinner } from "react-icons/tb";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import useAxiosSecure from "../../hooks/useAxiosSecure";
 import useAuth from "../../hooks/useAuth";
 import { imageUpload } from "../../utils/imageBBApi";
 import toast from "react-hot-toast";
 
+/**
+ * Props:
+ * - open, onClose
+ * - profile: {_id, name, image, phone, address, email ...}
+ * - refetch?: optional parent refetch
+ */
+
 const UpdateProfileModal = ({ open, onClose, profile, refetch }) => {
   const axiosSecure = useAxiosSecure();
   const { updateUserProfile } = useAuth();
+  const queryClient = useQueryClient();
 
-  const { name, image, phone, address, _id } = profile || {};
+  const userId = profile?._id;
 
+  // ---- Local form state ----
   const [form, setForm] = useState({
-    name: name || "",
-    phone: phone || "",
-    address: address || "",
+    name: profile?.name || "",
+    phone: profile?.phone || "",
+    address: profile?.address || "",
   });
-  const [imagePreview, setImagePreview] = useState(image || null);
-  const [imageUrl, setImageUrl] = useState(image || "");
-  const [loading, setLoading] = useState(false);
 
-  // Sync form when modal opens / profile changes
+  // `imageUrl` is the hosted URL we’ll save to DB
+  const [imageUrl, setImageUrl] = useState(profile?.image || "");
+  // `imagePreview` is what <img> uses (can be blob: or http(s))
+  const [imagePreview, setImagePreview] = useState(profile?.image || "");
+  const [uploadingImg, setUploadingImg] = useState(false);
+
+  // keep track of last blob to revoke
+  const lastBlobRef = useRef(null);
+
+  // Force re-fetch of http(s) images (not blob:)
+  const cacheBust = useMemo(() => Date.now(), []);
+  const withCacheBust = (url, bust) =>
+    /^https?:\/\//i.test(url)
+      ? `${url}${url.includes("?") ? "&" : "?"}t=${bust}`
+      : url;
+
+  // Sync when opened / profile changes
   useEffect(() => {
     if (!open) return;
     setForm({
@@ -29,9 +52,19 @@ const UpdateProfileModal = ({ open, onClose, profile, refetch }) => {
       phone: profile?.phone || "",
       address: profile?.address || "",
     });
-    setImagePreview(profile?.image || null);
     setImageUrl(profile?.image || "");
+    setImagePreview(profile?.image || "");
   }, [open, profile]);
+
+  // Revoke any leftover blob on unmount
+  useEffect(() => {
+    return () => {
+      if (lastBlobRef.current) {
+        URL.revokeObjectURL(lastBlobRef.current);
+        lastBlobRef.current = null;
+      }
+    };
+  }, []);
 
   const onChange = (e) => {
     const { name, value } = e.target;
@@ -42,53 +75,91 @@ const UpdateProfileModal = ({ open, onClose, profile, refetch }) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // // Optional: size guard (2MB)
-    // if (file.size > 2 * 1024 * 1024) {
-    //   toast.error("ছবির সাইজ ২MB এর কম হতে হবে।");
-    //   return;
-    // }
-
-    // Preview
-    const url = URL.createObjectURL(file);
-    setImagePreview(url);
+    // Create preview blob and revoke the old one
+    const blobUrl = URL.createObjectURL(file);
+    if (lastBlobRef.current) URL.revokeObjectURL(lastBlobRef.current);
+    lastBlobRef.current = blobUrl;
+    setImagePreview(blobUrl);
 
     try {
-      const hosted = await imageUpload(file); // returns hosted URL
+      setUploadingImg(true);
+      const hosted = await imageUpload(file); // must return http(s) URL
       setImageUrl(hosted);
+      // switch preview to hosted (so we see the real URL), with cache-bust
+      setImagePreview(
+        `${hosted}${hosted.includes("?") ? "&" : "?"}t=${Date.now()}`
+      );
+      // we can now revoke the temp blob
+      if (lastBlobRef.current) {
+        URL.revokeObjectURL(lastBlobRef.current);
+        lastBlobRef.current = null;
+      }
     } catch (err) {
       console.error(err);
       toast.error("ছবি আপলোড করা যায়নি।");
+      // keep the previous preview (if any)
+    } finally {
+      setUploadingImg(false);
     }
   };
 
-  const handleUpdate = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+  // ---- Mutation: update profile ----
+  const mutation = useMutation({
+    mutationFn: async (payload) => {
+      // 1) Firebase profile (displayName & photoURL)
+      await updateUserProfile(payload.name, payload.image);
+      // 2) Backend user doc (expect it to return updated user doc)
+      const { data } = await axiosSecure.patch(
+        `/user/update/${userId}`,
+        payload
+      );
+      return data;
+    },
+    onSuccess: (updated) => {
+      // Update caches so UI reflects instantly
+      queryClient.setQueryData(["user", userId], (old) => ({
+        ...(old || {}),
+        ...(updated || {}),
+        image: updated?.image
+          ? `${updated.image}${
+              updated.image.includes("?") ? "&" : "?"
+            }t=${Date.now()}`
+          : updated?.image,
+      }));
 
-    const updateData = {
+      // Invalidate any other consumers of the profile
+      queryClient.invalidateQueries({ queryKey: ["me"], exact: false });
+      queryClient.invalidateQueries({
+        queryKey: ["user", userId],
+        exact: false,
+      });
+
+      refetch?.(); // in case parent holds other derived data
+
+      toast.success("প্রোফাইল আপডেট হয়েছে!");
+      onClose();
+    },
+    onError: (err) => {
+      console.error(err);
+      toast.error("প্রোফাইল আপডেট ব্যর্থ হয়েছে।");
+    },
+  });
+
+  const handleUpdate = (e) => {
+    e.preventDefault();
+    if (uploadingImg) {
+      toast("ছবি আপলোড হচ্ছে… একটু অপেক্ষা করুন।");
+      return;
+    }
+    mutation.mutate({
       name: form.name,
       image: imageUrl,
       phone: form.phone,
       address: form.address,
-    };
-
-    try {
-      // 1) Firebase profile (displayName & photoURL)
-      await updateUserProfile(form.name, imageUrl);
-
-      // 2) Backend user doc
-      await axiosSecure.patch(`/user/update/${_id}`, updateData);
-
-      toast.success("প্রোফাইল আপডেট হয়েছে!");
-      await refetch?.();
-      onClose();
-    } catch (err) {
-      console.error(err);
-      toast.error("প্রোফাইল আপডেট ব্যর্থ হয়েছে।");
-    } finally {
-      setLoading(false);
-    }
+    });
   };
+
+  const busy = mutation.isLoading || uploadingImg;
 
   return (
     <Transition show={open} as={Fragment}>
@@ -135,9 +206,15 @@ const UpdateProfileModal = ({ open, onClose, profile, refetch }) => {
                       <div className="w-24 h-24 rounded-full bg-gray-100 border overflow-hidden shadow">
                         {imagePreview ? (
                           <img
-                            src={imagePreview}
-                            alt="preview"
+                            src={withCacheBust(imagePreview, cacheBust)}
+                            alt="avatar"
                             className="w-full h-full object-cover"
+                            referrerPolicy="no-referrer"
+                            onError={(e) => {
+                              // fallback (keeps circle)
+                              e.currentTarget.src =
+                                "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96'><rect width='100%' height='100%' fill='%23eee'/></svg>";
+                            }}
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
@@ -150,7 +227,7 @@ const UpdateProfileModal = ({ open, onClose, profile, refetch }) => {
                         htmlFor="photo"
                         className="cursor-pointer hind-siliguri-medium rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-green-50 hover:border-green-400 transition"
                       >
-                        ছবি বাছাই করুন
+                        {uploadingImg ? "আপলোড হচ্ছে…" : "ছবি বাছাই করুন"}
                       </label>
                       <input
                         id="photo"
@@ -210,15 +287,16 @@ const UpdateProfileModal = ({ open, onClose, profile, refetch }) => {
                       type="button"
                       onClick={onClose}
                       className="hind-siliguri-medium rounded-xl border border-gray-300 px-4 py-2 hover:bg-gray-50"
+                      disabled={busy}
                     >
                       বাতিল
                     </button>
                     <button
                       type="submit"
-                      disabled={loading}
+                      disabled={busy}
                       className="hind-siliguri-medium rounded-xl bg-green-600 hover:bg-green-700 text-white px-4 py-2 inline-flex items-center gap-2 disabled:opacity-60"
                     >
-                      {loading ? (
+                      {busy ? (
                         <>
                           <TbFidgetSpinner className="animate-spin" />
                           সেভ হচ্ছে...
