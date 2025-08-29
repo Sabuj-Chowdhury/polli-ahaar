@@ -15,8 +15,8 @@ app.use(
   cors({
     origin: [
       "http://localhost:5173",
-      "https://campflow-8fc76.web.app",
-      "https://campflow-8fc76.firebaseapp.com",
+      "https://polli-ahaar.web.app",
+      "https://polli-ahaar.firebaseapp.com",
     ],
   })
 );
