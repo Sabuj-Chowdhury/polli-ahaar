@@ -10,6 +10,9 @@ import Profile from "../pages/dashbooard/common/Profile";
 import AdminRoutes from "./AdminRoutes";
 import AddProduct from "../pages/dashbooard/admin/AddProduct";
 import ManageProducts from "../pages/dashbooard/admin/ManageProducts";
+import AdminAnalytics from "../pages/dashbooard/admin/AdminAnalytics";
+import ManageOrders from "../pages/dashbooard/admin/ManageOrders";
+import ManageUsers from "../pages/dashbooard/admin/ManageUsers";
 
 const router = createBrowserRouter([
   {
@@ -68,6 +71,36 @@ const router = createBrowserRouter([
           <PrivateRoute>
             <AdminRoutes>
               <ManageProducts />
+            </AdminRoutes>
+          </PrivateRoute>
+        ),
+      },
+      {
+        path: "admin-analytics",
+        element: (
+          <PrivateRoute>
+            <AdminRoutes>
+              <AdminAnalytics />
+            </AdminRoutes>
+          </PrivateRoute>
+        ),
+      },
+      {
+        path: "manage-order",
+        element: (
+          <PrivateRoute>
+            <AdminRoutes>
+              <ManageOrders />
+            </AdminRoutes>
+          </PrivateRoute>
+        ),
+      },
+      {
+        path: "manage-users",
+        element: (
+          <PrivateRoute>
+            <AdminRoutes>
+              <ManageUsers />
             </AdminRoutes>
           </PrivateRoute>
         ),

@@ -172,13 +172,15 @@ const Navbar = ({ cartCount = 0 }) => {
                   >
                     প্রোফাইল
                   </NavLink>
-                  <NavLink
-                    to="/dashboard/orders"
-                    className="block px-4 py-2 text-sm hover:bg-green-50 hind-siliguri-regular"
-                    onClick={() => setDropdownOpen(false)}
-                  >
-                    আমার অর্ডার
-                  </NavLink>
+                  {user.role === "user" && (
+                    <NavLink
+                      to="/dashboard/orders"
+                      className="block px-4 py-2 text-sm hover:bg-green-50 hind-siliguri-regular"
+                      onClick={() => setDropdownOpen(false)}
+                    >
+                      আমার অর্ডার
+                    </NavLink>
+                  )}
                   <button
                     onClick={onLogout}
                     className="block w-full text-left px-4 py-2 text-sm hover:bg-green-50 hind-siliguri-regular"
@@ -272,16 +274,18 @@ const Navbar = ({ cartCount = 0 }) => {
           >
             প্রোফাইল
           </NavLink>
-          <NavLink
-            to="/dashboard/orders"
-            className="block px-4 py-2 hover:bg-green-50 hind-siliguri-regular"
-            onClick={() => {
-              setDropdownOpen(false);
-              setMenuOpen(false);
-            }}
-          >
-            আমার অর্ডার
-          </NavLink>
+          {user.role === "user" && (
+            <NavLink
+              to="/dashboard/orders"
+              className="block px-4 py-2 hover:bg-green-50 hind-siliguri-regular"
+              onClick={() => {
+                setDropdownOpen(false);
+                setMenuOpen(false);
+              }}
+            >
+              আমার অর্ডার
+            </NavLink>
+          )}
           <button
             onClick={onLogout}
             className="block w-full text-left px-4 py-2 hover:bg-green-50 hind-siliguri-regular"
@@ -359,13 +363,15 @@ const Navbar = ({ cartCount = 0 }) => {
               >
                 প্রোফাইল
               </NavLink>
-              <NavLink
-                to="/dashboard/orders"
-                className="px-3 py-3 rounded-md hover:bg-green-100 hover:text-green-700 transition"
-                onClick={() => setMenuOpen(false)}
-              >
-                আমার অর্ডার
-              </NavLink>
+              {user.role === "user" && (
+                <NavLink
+                  to="/dashboard/orders"
+                  className="px-3 py-3 rounded-md hover:bg-green-100 hover:text-green-700 transition"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  আমার অর্ডার
+                </NavLink>
+              )}
               <button
                 onClick={() => {
                   onLogout();

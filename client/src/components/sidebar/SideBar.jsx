@@ -6,7 +6,7 @@ import { IoMdAddCircleOutline, IoMdListBox } from "react-icons/io";
 import { ImProfile } from "react-icons/im";
 import { IoAnalyticsSharp } from "react-icons/io5";
 import { MdManageSearch } from "react-icons/md";
-import { FaReceipt, FaTasks } from "react-icons/fa";
+import { FaReceipt, FaTasks, FaUsers } from "react-icons/fa";
 import useAuth from "../../hooks/useAuth";
 import useAdmin from "../../hooks/useAdmin";
 import toast from "react-hot-toast";
@@ -93,7 +93,7 @@ const SideBar = () => {
             </NavLink>
 
             <NavLink
-              to="/dashboard/manage-registered-camps"
+              to="/dashboard/manage-order"
               className={({ isActive }) =>
                 `${baseItem} ${isActive ? activeItem : ""}`
               }
@@ -101,8 +101,20 @@ const SideBar = () => {
               <FaTasks size={18} />
               {!isCollapsed && (
                 <span className="hind-siliguri-medium">
-                  রেজিস্ট্রেশন ম্যানেজমেন্ট
+                  অর্ডার ম্যানেজমেন্ট
                 </span>
+              )}
+            </NavLink>
+
+            <NavLink
+              to="/dashboard/manage-users"
+              className={({ isActive }) =>
+                `${baseItem} ${isActive ? activeItem : ""}`
+              }
+            >
+              <FaUsers size={18} /> {/* 👈 use user-related icon */}
+              {!isCollapsed && (
+                <span className="hind-siliguri-medium">ইউজার ম্যানেজমেন্ট</span>
               )}
             </NavLink>
 
