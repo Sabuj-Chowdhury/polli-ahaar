@@ -56,7 +56,8 @@ async function run() {
     // ******************************* DB/COLLECTIONS(START) *******************************************
     const db = client.db("PolliAhaarDB");
     const userCollection = db.collection("users");
-    const campCollection = db.collection("campaigns");
+    // const campCollection = db.collection("campaigns");
+    const productCollection = db.collection("products");
     const registrationCollection = db.collection("registrations");
     const paymentCollection = db.collection("payments");
     const reviewCollection = db.collection("reviews");
@@ -105,10 +106,10 @@ async function run() {
       res.send(result);
     });
 
-    // add camp to db
-    app.post("/add-camp", verifyToken, verifyAdmin, async (req, res) => {
+    // add product to db
+    app.post("/add-product", verifyToken, verifyAdmin, async (req, res) => {
       const data = req.body;
-      const result = await campCollection.insertOne(data);
+      const result = await productCollection.insertOne(data);
       res.send(result);
     });
 
@@ -236,30 +237,173 @@ async function run() {
       res.send({ admin });
     });
 
-    //  ********CAMP RELATED API*********
-    // *****DONE:Implement search
-    // get all camps data
-    app.get("/camps", async (req, res) => {
-      const search = req.query.search;
-      // console.log(search);
-      let query = {};
-      if (search) {
-        query = {
-          $or: [
-            {
-              campName: { $regex: search, $options: "i" },
-            },
-            {
-              professionalName: { $regex: search, $options: "i" },
-            },
-            {
-              location: { $regex: search, $options: "i" },
-            },
-          ],
-        };
+    // ✅ Get all users (admin only)
+    // Query params:
+    //   - search: fuzzy on name/email
+    //   - role: filter by role (e.g., "admin", "user")
+    //   - page: number (default 1)
+    //   - limit: number (default 20)
+    app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
+      try {
+        const { search = "", role, page = 1, limit = 20 } = req.query;
+
+        const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+        const limitNum = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
+        const skip = (pageNum - 1) * limitNum;
+
+        const query = {};
+        if (role) query.role = role;
+        if (search) {
+          const rx = { $regex: search, $options: "i" };
+          query.$or = [{ name: rx }, { email: rx }];
+        }
+
+        const [items, total] = await Promise.all([
+          userCollection
+            .find(query)
+            .project({ password: 0 }) // never return passwords if present
+            .sort({ _id: -1 })
+            .skip(skip)
+            .limit(limitNum)
+            .toArray(),
+          userCollection.countDocuments(query),
+        ]);
+
+        res.send({
+          total,
+          page: pageNum,
+          limit: limitNum,
+          pages: Math.ceil(total / limitNum),
+          items,
+        });
+      } catch (err) {
+        console.error("GET /users failed:", err);
+        res.status(500).send({ message: "Failed to fetch users" });
       }
-      const result = await campCollection.find(query).toArray();
-      res.send(result);
+    });
+
+    //  ********Product RELATED API*********
+    // GET /products
+    // Query:
+    // - search: string (fuzzy on name/type/brand/originDistrict/variants.label)
+    // - category: string
+    // - status: "active" | "draft"
+    // - featured: "true" | "false"
+    // - origin: string
+    // - brand: string
+    // - type: string
+    // - unit: "গ্রাম" | "কেজি" | "লিটার" | "পিস" | "বস্তা"
+    // - inStock: "true" (at least one variant with stock > 0)
+    // - minPrice, maxPrice: number (match any variant within range)
+    // - sort: "newest" | "asc" | "des"   (asc/des = by lowest variant price)
+    // - page, limit
+    app.get("/products", async (req, res) => {
+      try {
+        const {
+          search = "",
+          category,
+          status,
+          featured,
+          origin,
+          brand,
+          type,
+          unit,
+          inStock,
+          minPrice,
+          maxPrice,
+          sort = "newest",
+          page = 1,
+          limit = 20,
+        } = req.query;
+
+        const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+        const limitNum = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
+        const skip = (pageNum - 1) * limitNum;
+
+        // ---------- Build base match ----------
+        const and = [];
+
+        // simple equals filters
+        if (category) and.push({ category });
+        if (status) and.push({ status });
+        if (origin) and.push({ originDistrict: origin });
+        if (brand) and.push({ brand });
+        if (type) and.push({ type });
+
+        if (typeof featured !== "undefined") {
+          and.push({ featured: String(featured).toLowerCase() === "true" });
+        }
+
+        // unit filter (any variant with this unit)
+        if (unit) and.push({ "variants.unit": unit });
+
+        // in-stock (any variant with stock > 0)
+        if (String(inStock).toLowerCase() === "true") {
+          and.push({ "variants.stock": { $gt: 0 } });
+        }
+
+        // price range on any variant
+        const priceCond = {};
+        if (minPrice !== undefined) priceCond.$gte = Number(minPrice);
+        if (maxPrice !== undefined) priceCond.$lte = Number(maxPrice);
+        if (Object.keys(priceCond).length) {
+          and.push({ "variants.price": priceCond });
+        }
+
+        // search (case-insensitive)
+        if (search) {
+          const rx = { $regex: search, $options: "i" };
+          and.push({
+            $or: [
+              { name: rx },
+              { type: rx },
+              { brand: rx },
+              { originDistrict: rx },
+              { description: rx },
+              { "variants.label": rx },
+            ],
+          });
+        }
+
+        const matchStage = and.length ? { $and: and } : {};
+
+        // ---------- Total count (no need to sort for counting) ----------
+        const total = await productCollection.countDocuments(matchStage);
+
+        // ---------- Fetch page (aggregation to support price sorting) ----------
+        const pipeline = [{ $match: matchStage }];
+
+        // compute min price per product for sorting/filtering UX
+        pipeline.push({
+          $addFields: {
+            minPrice: { $min: "$variants.price" },
+          },
+        });
+
+        if (sort === "asc") {
+          pipeline.push({ $sort: { minPrice: 1, _id: -1 } });
+        } else if (sort === "des") {
+          pipeline.push({ $sort: { minPrice: -1, _id: -1 } });
+        } else {
+          // newest
+          pipeline.push({ $sort: { _id: -1 } });
+        }
+
+        pipeline.push({ $skip: skip }, { $limit: limitNum });
+
+        const items = await productCollection.aggregate(pipeline).toArray();
+
+        res.send({
+          total,
+          page: pageNum,
+          limit: limitNum,
+          pages: Math.ceil(total / limitNum),
+          items,
+        });
+      } catch (err) {
+        console.error("GET /products failed:", err);
+        res.status(500).send({ message: "Failed to fetch products" });
+      }
     });
 
     // get popular camps for homepage
@@ -549,8 +693,40 @@ async function run() {
       res.send(result);
     });
 
-    // update camp data
-    app.put("/camp/:id", verifyToken, verifyAdmin, async (req, res) => {
+    // ✅ Update user role (admin only)
+    // Body: { role: "admin" | "user" | "manager" }  <-- adjust allowed roles as you need
+    app.put("/user/:id/role", verifyToken, verifyAdmin, async (req, res) => {
+      try {
+        const { id } = req.params;
+        const { role } = req.body;
+
+        const ALLOWED_ROLES = new Set(["admin", "user"]); // ✏️ customize
+        if (!ALLOWED_ROLES.has(role)) {
+          return res.status(400).send({ message: "Invalid role" });
+        }
+
+        // (Optional) prevent self-demotion if you want:
+        // if (req.user?._id === id && role !== "admin") {
+        //   return res.status(400).send({ message: "You cannot change your own role." });
+        // }
+
+        const query = { _id: new ObjectId(id) };
+        const update = { $set: { role } };
+        const result = await userCollection.updateOne(query, update);
+
+        if (result.matchedCount === 0) {
+          return res.status(404).send({ message: "User not found" });
+        }
+
+        res.send({ modifiedCount: result.modifiedCount, role });
+      } catch (err) {
+        console.error("PUT /user/:id/role failed:", err);
+        res.status(500).send({ message: "Failed to update user role" });
+      }
+    });
+
+    // update product data
+    app.put("/product/:id", verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const data = req.body;
       const query = { _id: new ObjectId(id) };
@@ -560,7 +736,7 @@ async function run() {
       };
 
       const options = { upsert: true };
-      const result = await campCollection.updateOne(query, update, options);
+      const result = await productCollection.updateOne(query, update, options);
       res.send(result);
     });
 
@@ -610,12 +786,12 @@ async function run() {
       res.send(result);
     });
 
-    // ********CAMP RELATED API'S************
-    // delete Camp
-    app.delete("/camp/:id", verifyToken, async (req, res) => {
+    // ********Product RELATED API'S************
+    // delete product
+    app.delete("/product/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
-      const result = await campCollection.deleteOne(query);
+      const result = await productCollection.deleteOne(query);
       res.send(result);
     });
 
