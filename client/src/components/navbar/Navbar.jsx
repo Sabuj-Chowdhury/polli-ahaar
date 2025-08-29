@@ -8,9 +8,11 @@ import { useEffect, useRef, useState } from "react";
 import logo from "../../assets/logo.jpg";
 import useAuth from "../../hooks/useAuth";
 import toast from "react-hot-toast";
+import useCart from "../../hooks/useCart";
 
 const Navbar = ({ cartCount = 0 }) => {
   const { user, logOut } = useAuth();
+  const { count } = useCart();
   const navigate = useNavigate();
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -116,16 +118,15 @@ const Navbar = ({ cartCount = 0 }) => {
         {/* Right cluster (desktop): Cart + Auth */}
         <div className="hidden md:flex items-center gap-3">
           {/* Cart (icon) */}
+
           <Link
             to="/cart"
             className="relative inline-flex items-center rounded-xl border border-green-200 bg-white p-2 hover:bg-green-50 hover:text-green-700 transition"
-            aria-label="কার্ট"
-            title="কার্ট"
           >
             <AiOutlineShoppingCart size={20} />
-            {cartCount > 0 && (
+            {count > 0 && (
               <span className="absolute -top-1 -right-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-green-600 text-white text-xs px-1 hind-siliguri-regular">
-                {cartCount}
+                {count}
               </span>
             )}
           </Link>

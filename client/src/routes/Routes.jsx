@@ -14,6 +14,7 @@ import AdminAnalytics from "../pages/dashbooard/admin/AdminAnalytics";
 import ManageOrders from "../pages/dashbooard/admin/ManageOrders";
 import ManageUsers from "../pages/dashbooard/admin/ManageUsers";
 import AllProducts from "../pages/allProducts/AllProducts";
+import CartPage from "../pages/cart/CartPage";
 
 const router = createBrowserRouter([
   {
@@ -28,6 +29,10 @@ const router = createBrowserRouter([
       {
         path: "all-products",
         element: <AllProducts />,
+      },
+      {
+        path: "cart",
+        element: <CartPage />,
       },
     ],
   },

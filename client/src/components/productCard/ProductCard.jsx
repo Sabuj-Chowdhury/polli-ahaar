@@ -1,8 +1,11 @@
-// ProductCard.jsx
+// src/components/products/ProductCard.jsx
 import { motion } from "motion/react";
 import { FiShoppingCart } from "react-icons/fi";
+import useCart from "../../hooks/useCart";
 
-export const ProductCard = ({ p, onAddToCart }) => {
+export const ProductCard = ({ p }) => {
+  const { addItem } = useCart();
+
   // Min price from variants (or precomputed p.minPrice)
   const minPrice =
     typeof p.minPrice === "number"
@@ -18,7 +21,18 @@ export const ProductCard = ({ p, onAddToCart }) => {
     (sum, v) => sum + (Number(v?.stock) || 0),
     0
   );
-  const outOfStock = !Number.isFinite(totalStock) || totalStock <= 0;
+  const outOfStock = totalStock <= 0;
+
+  // Choose a default variant to add (first one that has stock)
+  const defaultVariant =
+    (p?.variants || []).find((v) => Number(v?.stock) > 0) || null;
+
+  const handleAddToCart = () => {
+    if (!outOfStock && defaultVariant) {
+      // CartContext takes (product, variant, qty=1)
+      addItem(p, defaultVariant, 1);
+    }
+  };
 
   return (
     <motion.div
@@ -40,7 +54,7 @@ export const ProductCard = ({ p, onAddToCart }) => {
           transition={{ type: "spring", stiffness: 180, damping: 16 }}
         />
 
-        {/* Stock badge (top-left) */}
+        {/* Badge (top-left) */}
         {outOfStock ? (
           <span className="absolute left-2 top-2 rounded-full bg-red-100 text-red-700 text-[11px] px-2 py-0.5">
             স্টক নেই
@@ -56,7 +70,7 @@ export const ProductCard = ({ p, onAddToCart }) => {
 
       {/* Body (flex to pin button at bottom) */}
       <div className="flex flex-col h-[calc(380px-((100%/4)*3))] p-4">
-        {/* Title + brand */}
+        {/* Title + brand (clamped for uniform height) */}
         <div>
           <h3 className="hind-siliguri-medium text-gray-900 line-clamp-2 leading-snug">
             {p.name}
@@ -68,29 +82,28 @@ export const ProductCard = ({ p, onAddToCart }) => {
           )}
         </div>
 
-        {/* Price + meta */}
+        {/* Price row */}
         <div className="mt-2 flex items-center justify-between">
           <div className="text-lg text-green-700">
             {Number.isFinite(minPrice) ? `৳ ${minPrice}` : "দাম দেখুন"}
           </div>
-          {/* Keep right side empty when not featured/out-of-stock so layout stays stable */}
+          {/* Invisible placeholder keeps layout stable */}
           <div className="text-[11px] text-gray-500 invisible">•</div>
         </div>
 
+        {/* Meta */}
         <div className="mt-1 text-[11px] text-gray-500 line-clamp-1">
           {p.category}
           {p.type ? ` • ${p.type}` : ""}
         </div>
 
-        {/* Spacer keeps button aligned */}
+        {/* Spacer keeps button aligned at bottom */}
         <div className="flex-1" />
 
         {/* Add to cart */}
         <motion.button
           type="button"
-          onClick={() => {
-            if (!outOfStock) onAddToCart?.(p);
-          }}
+          onClick={handleAddToCart}
           whileTap={!outOfStock ? { scale: 0.98 } : undefined}
           disabled={outOfStock}
           aria-disabled={outOfStock}
@@ -104,7 +117,7 @@ export const ProductCard = ({ p, onAddToCart }) => {
           title={outOfStock ? "স্টক নেই" : "কার্টে যোগ করুন"}
         >
           <FiShoppingCart />
-          <span className="hind-siliguri-medium text-sm cursor-pointer">
+          <span className="hind-siliguri-medium text-sm">
             {outOfStock ? "স্টক নেই" : "কার্টে যোগ করুন"}
           </span>
         </motion.button>
