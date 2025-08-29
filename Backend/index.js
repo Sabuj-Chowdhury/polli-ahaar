@@ -1,10 +1,8 @@
 require("dotenv").config();
-
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
-
 const jwt = require("jsonwebtoken");
 const app = express();
 
@@ -13,11 +11,7 @@ const port = process.env.PORT || 5000;
 // middleware
 app.use(
   cors({
-    origin: [
-      "http://localhost:5173",
-      "https://polli-ahaar.web.app",
-      "https://polli-ahaar.firebaseapp.com",
-    ],
+    origin: ["http://localhost:5173", "https://polli-ahaar.web.app"],
   })
 );
 
