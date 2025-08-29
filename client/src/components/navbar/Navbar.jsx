@@ -166,14 +166,14 @@ const Navbar = ({ cartCount = 0 }) => {
                   </div>
                   <div className="border-t border-green-200" />
                   <NavLink
-                    to="/profile"
+                    to="/dashboard"
                     className="block px-4 py-2 text-sm hover:bg-green-50 hind-siliguri-regular"
                     onClick={() => setDropdownOpen(false)}
                   >
                     প্রোফাইল
                   </NavLink>
                   <NavLink
-                    to="/orders"
+                    to="/dashboard/orders"
                     className="block px-4 py-2 text-sm hover:bg-green-50 hind-siliguri-regular"
                     onClick={() => setDropdownOpen(false)}
                   >
@@ -263,7 +263,7 @@ const Navbar = ({ cartCount = 0 }) => {
           </div>
           <div className="border-t border-green-200" />
           <NavLink
-            to="/profile"
+            to="/dashboard"
             className="block px-4 py-2 hover:bg-green-50 hind-siliguri-regular"
             onClick={() => {
               setDropdownOpen(false);
@@ -273,7 +273,7 @@ const Navbar = ({ cartCount = 0 }) => {
             প্রোফাইল
           </NavLink>
           <NavLink
-            to="/orders"
+            to="/dashboard/orders"
             className="block px-4 py-2 hover:bg-green-50 hind-siliguri-regular"
             onClick={() => {
               setDropdownOpen(false);
@@ -353,14 +353,14 @@ const Navbar = ({ cartCount = 0 }) => {
             <>
               <div className="my-2 mx-3 border-t border-green-200" />
               <NavLink
-                to="/profile"
+                to="/dashboard"
                 className="px-3 py-3 rounded-md hover:bg-green-100 hover:text-green-700 transition"
                 onClick={() => setMenuOpen(false)}
               >
                 প্রোফাইল
               </NavLink>
               <NavLink
-                to="/orders"
+                to="/dashboard/orders"
                 className="px-3 py-3 rounded-md hover:bg-green-100 hover:text-green-700 transition"
                 onClick={() => setMenuOpen(false)}
               >
