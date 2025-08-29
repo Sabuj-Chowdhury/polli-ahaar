@@ -13,6 +13,7 @@ import ManageProducts from "../pages/dashbooard/admin/ManageProducts";
 import AdminAnalytics from "../pages/dashbooard/admin/AdminAnalytics";
 import ManageOrders from "../pages/dashbooard/admin/ManageOrders";
 import ManageUsers from "../pages/dashbooard/admin/ManageUsers";
+import AllProducts from "../pages/allProducts/AllProducts";
 
 const router = createBrowserRouter([
   {
@@ -23,6 +24,10 @@ const router = createBrowserRouter([
       {
         index: true,
         element: <HomePage />,
+      },
+      {
+        path: "all-products",
+        element: <AllProducts />,
       },
     ],
   },

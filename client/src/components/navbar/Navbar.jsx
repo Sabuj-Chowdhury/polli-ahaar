@@ -87,7 +87,7 @@ const Navbar = ({ cartCount = 0 }) => {
           </NavLink>
 
           <NavLink
-            to="/shop"
+            to="/all-products"
             className={({ isActive }) =>
               `hind-siliguri-medium text-base px-3 py-2 rounded-md transition-colors duration-200 ${
                 isActive
@@ -339,7 +339,7 @@ const Navbar = ({ cartCount = 0 }) => {
             হোম
           </NavLink>
           <NavLink
-            to="/shop"
+            to="/all-products"
             className="px-3 py-3 rounded-md hover:bg-green-100 hover:text-green-700 transition"
             onClick={() => setMenuOpen(false)}
           >

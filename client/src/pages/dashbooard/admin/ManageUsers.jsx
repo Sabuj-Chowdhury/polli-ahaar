@@ -1,4 +1,3 @@
-// src/pages/Dashboard/ManageUsers/ManageUsers.jsx
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Swal from "sweetalert2";
