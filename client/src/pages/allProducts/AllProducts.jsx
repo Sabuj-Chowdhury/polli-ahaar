@@ -1,4 +1,3 @@
-// src/pages/Public/AllProducts/AllProducts.jsx
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { FiSearch, FiRefreshCcw } from "react-icons/fi";

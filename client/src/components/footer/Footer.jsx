@@ -1,4 +1,6 @@
+// src/components/Footer.jsx
 import { Link } from "react-router";
+import { motion } from "motion/react";
 import {
   FaFacebookF,
   FaInstagram,
@@ -13,8 +15,14 @@ const Footer = () => {
     <footer className="relative bg-gradient-to-b from-green-50 via-green-100 to-green-50 text-gray-800">
       {/* Top CTA band */}
       <div className="border-b border-green-200">
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:py-10 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div>
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ type: "spring", stiffness: 180, damping: 20 }}
+          className="mx-auto max-w-7xl px-4 py-8 sm:py-10 flex flex-col sm:flex-row items-center justify-between gap-4"
+        >
+          <div className="text-center sm:text-left">
             <h2 className="noto-serif-bengali-normal text-2xl">
               আমাদের ফেসবুক পরিবারে যোগ দিন
             </h2>
@@ -22,19 +30,30 @@ const Footer = () => {
               নতুন অফার ও আপডেট জানতে আমাদের ফলো করুন।
             </p>
           </div>
-          <a
+
+          <motion.a
             href="https://www.facebook.com/PalliAharChittagong"
             target="_blank"
-            rel="noreferrer"
-            className="hind-siliguri-semibold inline-flex items-center gap-2 rounded-xl bg-green-600 px-5 py-3 text-white text-sm hover:bg-green-700 transition"
+            rel="noopener noreferrer"
+            whileHover={{ y: -1 }}
+            whileTap={{ scale: 0.98 }}
+            className="hind-siliguri-semibold inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 px-5 py-3 text-white text-sm shadow-sm hover:shadow-md transition"
+            aria-label="ফেসবুক পেজ ফলো করুন"
+            title="ফেসবুক পেজ ফলো করুন"
           >
             <FaFacebookF /> ফেসবুক পেজ ফলো করুন
-          </a>
-        </div>
+          </motion.a>
+        </motion.div>
       </div>
 
       {/* Main footer */}
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:py-16">
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-60px" }}
+        transition={{ type: "spring", stiffness: 180, damping: 20 }}
+        className="mx-auto max-w-7xl px-4 py-12 sm:py-16"
+      >
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-3">
           {/* Brand / About */}
           <div>
@@ -43,35 +62,21 @@ const Footer = () => {
               খাঁটি মধু, দেশি চাল, ঘি ও মশলা—গ্রামীণ স্বাদের আসল ঠিকানা। বিশুদ্ধ
               ও নিরাপদ খাদ্য, সারা দেশে ডেলিভারি।
             </p>
+
             {/* Social */}
             <div className="mt-4 flex items-center gap-3">
-              <a
+              <IconLink
                 href="https://www.facebook.com/PalliAharChittagong"
-                target="_blank"
-                rel="noreferrer"
-                className="group inline-flex h-9 w-9 items-center justify-center rounded-full border border-green-200 bg-white hover:bg-green-600 hover:text-white transition"
-                aria-label="Facebook"
+                label="Facebook"
               >
                 <FaFacebookF />
-              </a>
-              <a
-                href="https://instagram.com"
-                target="_blank"
-                rel="noreferrer"
-                className="group inline-flex h-9 w-9 items-center justify-center rounded-full border border-green-200 bg-white hover:bg-green-600 hover:text-white transition"
-                aria-label="Instagram"
-              >
+              </IconLink>
+              <IconLink href="https://instagram.com" label="Instagram">
                 <FaInstagram />
-              </a>
-              <a
-                href="https://wa.me/8801887640827"
-                target="_blank"
-                rel="noreferrer"
-                className="group inline-flex h-9 w-9 items-center justify-center rounded-full border border-green-200 bg-white hover:bg-green-600 hover:text-white transition"
-                aria-label="WhatsApp"
-              >
+              </IconLink>
+              <IconLink href="https://wa.me/8801887640827" label="WhatsApp">
                 <FaWhatsapp />
-              </a>
+              </IconLink>
             </div>
           </div>
 
@@ -80,36 +85,17 @@ const Footer = () => {
             <h3 className="noto-serif-bengali-normal text-lg">নেভিগেশন</h3>
             <ul className="mt-3 space-y-2">
               <li>
-                <Link
-                  to="/"
-                  className="hind-siliguri-regular inline-block text-sm hover:text-green-700 transition"
-                >
-                  হোম
-                </Link>
+                <NavLink to="/">হোম</NavLink>
               </li>
               <li>
-                <Link
-                  to="/shop"
-                  className="hind-siliguri-regular inline-block text-sm hover:text-green-700 transition"
-                >
-                  পণ্যসমূহ
-                </Link>
+                <NavLink to="/all-products">পণ্যসমূহ</NavLink>
+                {/* If your route is /all-products, change to to="/all-products" */}
               </li>
               <li>
-                <Link
-                  to="/about"
-                  className="hind-siliguri-regular inline-block text-sm hover:text-green-700 transition"
-                >
-                  আমাদের সম্পর্কে
-                </Link>
+                <NavLink to="/about">আমাদের সম্পর্কে</NavLink>
               </li>
               <li>
-                <Link
-                  to="/contact"
-                  className="hind-siliguri-regular inline-block text-sm hover:text-green-700 transition"
-                >
-                  যোগাযোগ
-                </Link>
+                <NavLink to="/contact">যোগাযোগ</NavLink>
               </li>
             </ul>
           </div>
@@ -151,9 +137,39 @@ const Footer = () => {
             © {new Date().getFullYear()} পল্লী আহার — সর্বস্বত্ব সংরক্ষিত।
           </p>
         </div>
-      </div>
+      </motion.div>
     </footer>
   );
 };
+
+const NavLink = ({ to, children }) => (
+  <motion.div
+    whileHover={{ x: 2 }}
+    whileTap={{ scale: 0.98 }}
+    className="inline-block"
+  >
+    <Link
+      to={to}
+      className="hind-siliguri-regular text-sm hover:text-green-700 transition"
+    >
+      {children}
+    </Link>
+  </motion.div>
+);
+
+const IconLink = ({ href, label, children }) => (
+  <motion.a
+    href={href}
+    target="_blank"
+    rel="noopener noreferrer"
+    aria-label={label}
+    whileHover={{ y: -2 }}
+    whileTap={{ scale: 0.96 }}
+    className="group inline-flex h-9 w-9 items-center justify-center rounded-full border border-green-200 bg-white hover:bg-green-600 hover:text-white transition"
+  >
+    {children}
+    <span className="sr-only">{label}</span>
+  </motion.a>
+);
 
 export default Footer;

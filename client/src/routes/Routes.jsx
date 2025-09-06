@@ -15,6 +15,8 @@ import ManageOrders from "../pages/dashbooard/admin/ManageOrders";
 import ManageUsers from "../pages/dashbooard/admin/ManageUsers";
 import AllProducts from "../pages/allProducts/AllProducts";
 import CartPage from "../pages/cart/CartPage";
+import AboutUs from "../pages/aboutUs/AboutUs";
+import Contact from "../pages/contact/Contact";
 
 const router = createBrowserRouter([
   {
@@ -33,6 +35,14 @@ const router = createBrowserRouter([
       {
         path: "cart",
         element: <CartPage />,
+      },
+      {
+        path: "about",
+        element: <AboutUs />,
+      },
+      {
+        path: "contact",
+        element: <Contact />,
       },
     ],
   },

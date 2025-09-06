@@ -102,6 +102,19 @@ const Navbar = ({ cartCount = 0 }) => {
           </NavLink>
 
           <NavLink
+            to="/about"
+            className={({ isActive }) =>
+              `hind-siliguri-medium text-base px-3 py-2 rounded-md transition-colors duration-200 ${
+                isActive
+                  ? "bg-green-100 text-green-700 hind-siliguri-semibold"
+                  : "hover:bg-green-50 hover:text-green-700"
+              }`
+            }
+          >
+            আমাদের সম্পর্কে
+          </NavLink>
+
+          <NavLink
             to="/contact"
             className={({ isActive }) =>
               `hind-siliguri-medium text-base px-3 py-2 rounded-md transition-colors duration-200 ${
@@ -346,6 +359,15 @@ const Navbar = ({ cartCount = 0 }) => {
           >
             পণ্যসমূহ
           </NavLink>
+
+          <NavLink
+            to="/about"
+            className="px-3 py-3 rounded-md hover:bg-green-100 hover:text-green-700 transition"
+            onClick={() => setMenuOpen(false)}
+          >
+            আমাদের সম্পর্কে
+          </NavLink>
+
           <NavLink
             to="/contact"
             className="px-3 py-3 rounded-md hover:bg-green-100 hover:text-green-700 transition"
