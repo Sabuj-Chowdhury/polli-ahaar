@@ -1,7 +1,7 @@
 // src/components/products/ProductCard.jsx
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { FiShoppingCart, FiCheck } from "react-icons/fi";
+import { FiShoppingCart, FiCheck, FiShoppingBag } from "react-icons/fi"; // 👈 added
 import useCart from "../../hooks/useCart";
 
 export const ProductCard = ({ p }) => {
@@ -28,7 +28,7 @@ export const ProductCard = ({ p }) => {
   const defaultVariant =
     (p?.variants || []).find((v) => Number(v?.stock) > 0) || null;
 
-  // --- single-variant badge text (label → title → qty+unit) ---
+  // --- single-variant badge text ---
   const one =
     Array.isArray(p?.variants) && p.variants.length === 1
       ? p.variants[0]
@@ -38,6 +38,10 @@ export const ProductCard = ({ p }) => {
     one?.label?.toString().trim() ||
     one?.title?.toString().trim() ||
     (one?.qty && one?.unit ? `${one.qty} ${one.unit}` : null);
+
+  // --- order count (for badge) ---
+  const orderCount = Number(p?.orderCount) || 0;
+  const orderCountBn = orderCount.toLocaleString("bn-BD");
 
   // --- button micro-states ---
   const [isAdding, setIsAdding] = useState(false);
@@ -94,6 +98,18 @@ export const ProductCard = ({ p }) => {
             {singleVariantLabel}
           </span>
         )}
+
+        {/* 👇 Order count badge (bottom-left) */}
+        {orderCount > 0 && (
+          <span
+            className="absolute left-2 bottom-2 inline-flex items-center gap-1.5 rounded-full border border-green-200 bg-white/95 backdrop-blur px-2.5 py-1 text-[11px] text-green-700 shadow-sm"
+            title={`${orderCountBn} বার অর্ডার হয়েছে`}
+            aria-label={`${orderCountBn} বার অর্ডার হয়েছে`}
+          >
+            <FiShoppingBag className="text-green-700" />
+            <span>{orderCountBn} বার অর্ডার হয়েছে</span>
+          </span>
+        )}
       </div>
 
       {/* Body */}
@@ -118,10 +134,10 @@ export const ProductCard = ({ p }) => {
           <div className="text-[11px] text-gray-500 invisible">•</div>
         </div>
 
-        {/* Spacer to pin the button */}
+        {/* Spacer */}
         <div className="flex-1" />
 
-        {/* Better Cart Button */}
+        {/* Cart Button */}
         <motion.button
           type="button"
           onClick={handleAddToCart}
@@ -143,7 +159,6 @@ export const ProductCard = ({ p }) => {
                 : "bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-sm hover:shadow-md"
             }`}
         >
-          {/* subtle moving shine */}
           {!outOfStock && !isAdding && (
             <motion.span className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100">
               <motion.span
