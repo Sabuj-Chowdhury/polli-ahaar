@@ -561,23 +561,6 @@ async function run() {
       }
     });
 
-    // // get popular camps for homepage
-    // app.get("/camps/popular", async (req, res) => {
-    //   const sort = {
-    //     count: -1, // for highest participation count
-    //   };
-    //   const result = await campCollection.find().sort(sort).limit(6).toArray();
-    //   res.send(result);
-    // });
-
-    // get camp details by id
-    // app.get("/camp/:id", async (req, res) => {
-    //   const id = req.params.id;
-    //   const query = { _id: new ObjectId(id) };
-    //   const result = await campCollection.findOne(query);
-    //   res.send(result);
-    // });
-
     //  ********Registration RELATED API*********
 
     // get all registration data
@@ -845,6 +828,47 @@ async function run() {
       const options = { upsert: true };
       const result = await productCollection.updateOne(query, update, options);
       res.send(result);
+    });
+
+    //  ********ORDER RELATED API*********
+
+    // PATCH: update shipping info of an order
+    app.patch("/orders/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        if (!ObjectId.isValid(id)) {
+          return res.status(400).send({ message: "Invalid order ID" });
+        }
+
+        const { shipping } = req.body;
+        if (!shipping?.name || !shipping?.phone || !shipping?.address) {
+          return res
+            .status(400)
+            .send({ message: "Missing required shipping fields" });
+        }
+
+        const query = { _id: new ObjectId(id) };
+        const update = {
+          $set: {
+            shipping,
+            updatedAt: new Date(),
+          },
+        };
+
+        const result = await orderCollection.updateOne(query, update);
+
+        if (result.matchedCount === 0) {
+          return res.status(404).send({ message: "Order not found" });
+        }
+
+        res.send({
+          message: "Order updated successfully",
+          modifiedCount: result.modifiedCount,
+        });
+      } catch (err) {
+        console.error("Error updating order:", err);
+        res.status(500).send({ message: "Server error while updating order" });
+      }
     });
 
     //  ********Registration RELATED API*********
