@@ -103,14 +103,14 @@ const Login = () => {
                 {showPass ? "লুকান" : "দেখুন"}
               </button>
             </div>
-            <div className="text-right mt-1">
+            {/* <div className="text-right mt-1">
               <Link
                 to="/reset-password"
                 className="hind-siliguri-regular text-xs text-green-700 hover:underline"
               >
                 পাসওয়ার্ড ভুলে গেছেন?
               </Link>
-            </div>
+            </div> */}
           </div>
 
           <button
