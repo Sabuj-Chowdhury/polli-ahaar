@@ -1,3 +1,4 @@
+// src/provider/AuthProvider.jsx
 import {
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
@@ -7,7 +8,6 @@ import {
   signOut,
   updateProfile,
 } from "firebase/auth";
-
 import { useEffect, useState } from "react";
 import useAxiosPublic from "../hooks/useAxiosPublic";
 import auth from "../firebase/firebase.config";
@@ -15,8 +15,28 @@ import AuthContext from "../context/AuthContext";
 
 const googleProvider = new GoogleAuthProvider();
 
+/** Read a minimal user (for instant UI hydration) */
+const readMinimalUser = () => {
+  try {
+    const raw = localStorage.getItem("auth_user_min");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+/** Write/remove minimal user */
+const writeMinimalUser = (u) => {
+  if (!u) {
+    localStorage.removeItem("auth_user_min");
+  } else {
+    localStorage.setItem("auth_user_min", JSON.stringify(u));
+  }
+};
+
 const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  // ⬇️ start with minimal user so Navbar doesn’t flash “লগইন”
+  const [user, setUser] = useState(readMinimalUser);
   const [loading, setLoading] = useState(true);
   const axiosPublic = useAxiosPublic();
 
@@ -49,59 +69,74 @@ const AuthProvider = ({ children }) => {
   // log out
   const logOut = async () => {
     setLoading(true);
-    return signOut(auth);
+    try {
+      await signOut(auth);
+    } finally {
+      // 🔒 clear all local caches immediately so UI flips to logged out state
+      localStorage.removeItem("token");
+      localStorage.removeItem("auth_user_min");
+      localStorage.removeItem("is_admin"); // if you cache role in useAdmin
+      setUser(null);
+      setLoading(false);
+    }
   };
 
-  // observer from firebase
-  // onAuthStateChange
-  // observer from firebase
+  // Firebase auth observer
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-
-      if (currentUser?.email) {
-        console.log("CurrentUser-->", currentUser.email);
-
-        const user = {
-          email: currentUser.email,
-          name: currentUser.displayName || "", // allow empty
-          image: currentUser.photoURL || "", // allow empty
-        };
-
-        // save user in DB
-        try {
-          await axiosPublic.post("/users", user);
-        } catch (err) {
-          console.error("Error saving user:", err);
-        }
-
-        // always fetch JWT if email exists
-        try {
-          const res = await axiosPublic.post("/jwt", {
+      try {
+        if (currentUser?.email) {
+          // Build a tiny user for instant UI (only what navbar needs)
+          const minimal = {
+            uid: currentUser.uid,
             email: currentUser.email,
-          });
-          if (res.data.token) {
-            localStorage.setItem("token", res.data.token);
+            displayName: currentUser.displayName || "",
+            photoURL: currentUser.photoURL || "",
+          };
+
+          setUser(minimal);
+          writeMinimalUser(minimal);
+
+          // 1) upsert user in DB (safe to ignore conflicts)
+          try {
+            await axiosPublic.post("/users", {
+              email: minimal.email,
+              name: minimal.displayName,
+              image: minimal.photoURL,
+            });
+          } catch (err) {
+            // non-fatal
+            console.error("save /users failed:", err?.response?.data || err);
           }
-        } catch (error) {
-          console.error("Error fetching JWT:", error);
+
+          // 2) fetch JWT for secure routes
+          try {
+            const res = await axiosPublic.post("/jwt", {
+              email: minimal.email,
+            });
+            if (res?.data?.token) {
+              localStorage.setItem("token", res.data.token);
+            } else {
+              localStorage.removeItem("token");
+            }
+          } catch (err) {
+            console.error("fetch /jwt failed:", err?.response?.data || err);
+            localStorage.removeItem("token");
+          }
+        } else {
+          // No user
+          setUser(null);
+          writeMinimalUser(null);
           localStorage.removeItem("token");
         }
-      } else {
-        // no user logged in
-        localStorage.removeItem("token");
-        console.log("CurrentUser-->", null);
+      } finally {
+        setLoading(false);
       }
-
-      setLoading(false);
     });
 
     return () => unsubscribe();
   }, [axiosPublic]);
 
-  // console.log(user);
-
-  // props
   const authInfo = {
     createUser,
     signIn,
