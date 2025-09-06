@@ -561,6 +561,91 @@ async function run() {
       }
     });
 
+    // ✅ Get all orders (admin only)
+    app.get("/orders", verifyToken, verifyAdmin, async (req, res) => {
+      try {
+        const {
+          search = "",
+          status,
+          page = 1,
+          limit = 20,
+          sort = "newest",
+        } = req.query;
+
+        const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+        const limitNum = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
+        const skip = (pageNum - 1) * limitNum;
+
+        const query = {};
+
+        // status filter
+        if (status) {
+          query.status = status;
+        }
+
+        // search across shipping fields + exact _id if valid
+        if (search) {
+          const rx = { $regex: search, $options: "i" };
+          const or = [
+            { "shipping.name": rx },
+            { "shipping.email": rx },
+            { "shipping.phone": rx },
+            { "shipping.address": rx },
+          ];
+
+          // If search looks like an ObjectId, include exact _id match
+          if (ObjectId.isValid(search)) {
+            or.push({ _id: new ObjectId(search) });
+          } else {
+            // Optional: allow searching last 6-8 chars of _id by stringifying
+            // Requires MongoDB 4.0+: $toString
+            or.push({
+              $expr: {
+                $regexMatch: {
+                  input: { $toString: "$_id" },
+                  regex: search,
+                  options: "i",
+                },
+              },
+            });
+          }
+          query.$or = or;
+        }
+
+        const sortStage = sort === "oldest" ? { _id: 1 } : { _id: -1 };
+
+        const [items, total] = await Promise.all([
+          orderCollection
+            .find(query)
+            .project({
+              // return the fields your UI needs
+              items: 1,
+              shipping: 1,
+              status: 1,
+              amounts: 1,
+              createdAt: 1,
+              reviewed: 1,
+            })
+            .sort(sortStage)
+            .skip(skip)
+            .limit(limitNum)
+            .toArray(),
+          orderCollection.countDocuments(query),
+        ]);
+
+        res.send({
+          total,
+          page: pageNum,
+          limit: limitNum,
+          pages: Math.ceil(total / limitNum),
+          items,
+        });
+      } catch (err) {
+        console.error("GET /orders failed:", err);
+        res.status(500).send({ message: "Failed to fetch orders" });
+      }
+    });
+
     //  ********Registration RELATED API*********
 
     // get all registration data
@@ -833,7 +918,7 @@ async function run() {
     //  ********ORDER RELATED API*********
 
     // PATCH: update shipping info of an order
-    app.patch("/orders/:id", async (req, res) => {
+    app.patch("/orders/:id", verifyToken, async (req, res) => {
       try {
         const id = req.params.id;
         if (!ObjectId.isValid(id)) {
@@ -868,6 +953,48 @@ async function run() {
       } catch (err) {
         console.error("Error updating order:", err);
         res.status(500).send({ message: "Server error while updating order" });
+      }
+    });
+
+    // PATCH: cancel order
+    app.patch("/orders/:id/cancel", verifyToken, async (req, res) => {
+      try {
+        const id = req.params.id;
+        if (!ObjectId.isValid(id)) {
+          return res.status(400).send({ message: "Invalid order ID" });
+        }
+
+        const query = { _id: new ObjectId(id) };
+
+        // allow cancel only if status is still pending
+        const order = await orderCollection.findOne(query);
+        if (!order) {
+          return res.status(404).send({ message: "Order not found" });
+        }
+        if (order.status && order.status.toLowerCase() !== "pending") {
+          return res
+            .status(400)
+            .send({ message: "Only pending orders can be cancelled" });
+        }
+
+        const update = {
+          $set: {
+            status: "cancelled",
+            cancelledAt: new Date(),
+          },
+        };
+
+        const result = await orderCollection.updateOne(query, update);
+
+        res.send({
+          message: "Order cancelled successfully",
+          modifiedCount: result.modifiedCount,
+        });
+      } catch (err) {
+        console.error("Error cancelling order:", err);
+        res
+          .status(500)
+          .send({ message: "Server error while cancelling order" });
       }
     });
 
