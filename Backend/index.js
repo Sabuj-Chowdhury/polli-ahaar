@@ -50,11 +50,8 @@ async function run() {
     // ******************************* DB/COLLECTIONS(START) *******************************************
     const db = client.db("PolliAhaarDB");
     const userCollection = db.collection("users");
-    // const campCollection = db.collection("campaigns");
     const productCollection = db.collection("products");
     const orderCollection = db.collection("orders");
-    const registrationCollection = db.collection("registrations");
-    const paymentCollection = db.collection("payments");
     const reviewCollection = db.collection("reviews");
     // ******************************* DB/COLLECTIONS(END) *******************************************
 
@@ -109,60 +106,102 @@ async function run() {
     });
 
     // POST /orders
-    // Body shape:
-    // {
-    //   items: [
-    //     { productId: "66b11...abc", variantLabel: "১ কেজি", price: 140, qty: 2 },
-    //     { productId: "66b22...def", variantLabel: "500g",  price: 210, qty: 1 }
-    //   ],
-    //   shipping: { name, phone, address, note },   // whatever you collect
-    //   payment:  { method: "COD" }                 // optional
-    // }
+
+    // POST /orders (updated to accept name, label, imageUrl, productsSummary)
     app.post("/orders", verifyToken, async (req, res) => {
       try {
-        const { items, shipping = {}, payment = {} } = req.body;
+        const {
+          items,
+          productsSummary: clientSummary,
+          shipping = {},
+          payment = {},
+        } = req.body;
 
         // --- basic validations ---
         if (!Array.isArray(items) || items.length === 0) {
           return res.status(400).send({ message: "No items provided." });
         }
+
+        // validate each item & normalize
+        const normalizedItems = [];
         for (const it of items) {
-          if (!it.productId || !ObjectId.isValid(it.productId) || !it.qty) {
+          const { productId, qty } = it || {};
+          if (!productId || !ObjectId.isValid(productId) || !qty) {
             return res.status(400).send({ message: "Invalid item payload." });
           }
+
+          // normalize fields coming from the frontend
+          const name = typeof it.name === "string" ? it.name.trim() : null;
+          const label = (it.label ?? it.variantLabel ?? null) || null; // accept either field
+          const imageUrl =
+            typeof it.imageUrl === "string" && it.imageUrl.trim().length
+              ? it.imageUrl.trim()
+              : null;
+
+          normalizedItems.push({
+            productId: new ObjectId(productId),
+            name, // ✅ store product name for audit/history
+            label, // ✅ unified label field
+            variantLabel: label, // ✅ keep legacy field for compatibility
+            imageUrl, // ✅ store image url for order snapshot
+            price: Number(it.price) || 0,
+            qty: Number(qty) || 1,
+          });
         }
 
         // --- compute totals (server-side safety) ---
-        const subtotal = items.reduce(
+        const subtotal = normalizedItems.reduce(
           (s, it) => s + Number(it.price || 0) * Number(it.qty || 0),
           0
         );
         const grandTotal = subtotal; // add delivery charge/discount here if you have
 
+        // --- build products summary (server-side truth) ---
+        const totalsByProduct = normalizedItems.reduce((acc, it) => {
+          const key = it.productId.toString();
+          if (!acc[key]) {
+            acc[key] = {
+              productId: it.productId,
+              name: it.name ?? null,
+              imageUrl: it.imageUrl ?? null,
+              totalQty: 0,
+            };
+          }
+          acc[key].totalQty += Number(it.qty) || 0;
+          return acc;
+        }, {});
+        const serverSummary = Object.values(totalsByProduct);
+
+        // choose server summary, but keep clientSummary if you want to inspect later
+        const finalProductsSummary = serverSummary;
+
+        // derive user email from token if available; fall back to shipping
+        const userEmail =
+          (req.user && (req.user.email || req.user.userEmail)) ||
+          shipping?.email ||
+          null;
+
         // --- order doc ---
+        const now = new Date();
         const orderDoc = {
-          userEmail: req.body.shipping?.email || null, // from verifyToken
-          items: items.map((it) => ({
-            productId: new ObjectId(it.productId),
-            variantLabel: it.variantLabel ?? null,
-            price: Number(it.price) || 0,
-            qty: Number(it.qty) || 1,
-          })),
+          userEmail,
+          items: normalizedItems,
+          productsSummary: finalProductsSummary, // ✅ saved with order
           shipping,
           payment,
           amounts: { subtotal, grandTotal },
           status: "pending", // pending | confirmed | shipped | delivered | cancelled
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          createdAt: now,
+          updatedAt: now,
         };
 
         // --- insert the order first ---
         const orderResult = await orderCollection.insertOne(orderDoc);
 
         // --- increment orderCount on each product (by qty) ---
-        const incOps = items.map((it) => ({
+        const incOps = normalizedItems.map((it) => ({
           updateOne: {
-            filter: { _id: new ObjectId(it.productId) },
+            filter: { _id: it.productId },
             update: { $inc: { orderCount: Number(it.qty) || 0 } }, // creates field if missing
           },
         }));
@@ -171,18 +210,17 @@ async function run() {
         }
 
         // --- OPTIONAL: reduce stock on the specific variant ---
-        // If your product doc looks like:
+        // Product schema example:
         // { _id, variants: [{ label: "১ কেজি", stock: 10, ... }, ...] }
-        // this will subtract qty from the matching variant's stock (never below 0)
-        const stockOps = items
-          .filter((it) => it.variantLabel)
+        const stockOps = normalizedItems
+          .filter((it) => it.label) // use unified 'label'
           .map((it) => ({
             updateOne: {
-              filter: { _id: new ObjectId(it.productId) },
+              filter: { _id: it.productId },
               update: {
                 $inc: { "variants.$[v].stock": -Math.abs(Number(it.qty) || 0) },
               },
-              arrayFilters: [{ "v.label": it.variantLabel }],
+              arrayFilters: [{ "v.label": it.label }],
             },
           }));
         if (stockOps.length) {
@@ -200,102 +238,118 @@ async function run() {
       }
     });
 
-    // save registration data in registrationCollection and increase count on campCollection
-    app.post("/camp/registration", verifyToken, async (req, res) => {
-      // save data in db
-      const data = req.body;
-      const result = await registrationCollection.insertOne({
-        ...data,
-        timeStamp: Date.now(),
-      });
-      // increase count on campCollection
-      const query = { _id: new ObjectId(data.campId) };
-      const update = {
-        $inc: { count: 1 },
-      };
-      const updateCount = await campCollection.updateOne(query, update);
+    // Body shape:
+    // {
+    //   items: [
+    //     { productId: "66b11...abc", variantLabel: "১ কেজি", price: 140, qty: 2 },
+    //     { productId: "66b22...def", variantLabel: "500g",  price: 210, qty: 1 }
+    //   ],
+    //   shipping: { name, phone, address, note },   // whatever you collect
+    //   payment:  { method: "COD" }                 // optional
+    // }
+    // app.post("/orders", verifyToken, async (req, res) => {
+    //   try {
+    //     const { items, shipping = {}, payment = {} } = req.body;
 
-      res.send(result);
-    });
+    //     // --- basic validations ---
+    //     if (!Array.isArray(items) || items.length === 0) {
+    //       return res.status(400).send({ message: "No items provided." });
+    //     }
+    //     for (const it of items) {
+    //       if (!it.productId || !ObjectId.isValid(it.productId) || !it.qty) {
+    //         return res.status(400).send({ message: "Invalid item payload." });
+    //       }
+    //     }
 
-    // payment collection related api
-    app.post("/payments", verifyToken, async (req, res) => {
-      const data = req.body;
-      const result = await paymentCollection.insertOne(data);
+    //     // --- compute totals (server-side safety) ---
+    //     const subtotal = items.reduce(
+    //       (s, it) => s + Number(it.price || 0) * Number(it.qty || 0),
+    //       0
+    //     );
+    //     const grandTotal = subtotal; // add delivery charge/discount here if you have
 
-      // update payment status in registration collection
-      const query = { _id: new ObjectId(data?.registrationId) };
-      const updateDoc = {
-        $set: {
-          payment_status: "paid",
-        },
-      };
-      const update = await registrationCollection.updateOne(query, updateDoc);
-      res.send(result);
-    });
+    //     // --- order doc ---
+    //     const orderDoc = {
+    //       userEmail: req.body.shipping?.email || null, // from verifyToken
+    //       items: items.map((it) => ({
+    //         productId: new ObjectId(it.productId),
+    //         variantLabel: it.variantLabel ?? null,
+    //         price: Number(it.price) || 0,
+    //         qty: Number(it.qty) || 1,
+    //       })),
+    //       shipping,
+    //       payment,
+    //       amounts: { subtotal, grandTotal },
+    //       status: "pending", // pending | confirmed | shipped | delivered | cancelled
+    //       createdAt: new Date(),
+    //       updatedAt: new Date(),
+    //     };
 
-    // *******STRIPE RELATED API'S*********
-    // create payment intent
-    app.post("/payment-intent", verifyToken, async (req, res) => {
-      const data = req.body;
+    //     // --- insert the order first ---
+    //     const orderResult = await orderCollection.insertOne(orderDoc);
 
-      const query = { _id: new ObjectId(data.campId) };
-      const camp = await campCollection.findOne(query);
-      let totalPrice;
-      if (camp) {
-        totalPrice = camp.price * 100; //price in cent's
-        const { client_secret } = await stripe.paymentIntents.create({
-          amount: totalPrice,
-          currency: "usd",
-          automatic_payment_methods: {
-            enabled: true,
-          },
-        });
-        res.send({ client_secret });
-      }
+    //     // --- increment orderCount on each product (by qty) ---
+    //     const incOps = items.map((it) => ({
+    //       updateOne: {
+    //         filter: { _id: new ObjectId(it.productId) },
+    //         update: { $inc: { orderCount: Number(it.qty) || 0 } }, // creates field if missing
+    //       },
+    //     }));
+    //     if (incOps.length) {
+    //       await productCollection.bulkWrite(incOps, { ordered: false });
+    //     }
 
-      // const totalPrice = data.price * 100; //price in cent's
-      // console.log(totalPrice);
-    });
+    //     // --- OPTIONAL: reduce stock on the specific variant ---
+    //     // If your product doc looks like:
+    //     // { _id, variants: [{ label: "১ কেজি", stock: 10, ... }, ...] }
+    //     // this will subtract qty from the matching variant's stock (never below 0)
+    //     const stockOps = items
+    //       .filter((it) => it.variantLabel)
+    //       .map((it) => ({
+    //         updateOne: {
+    //           filter: { _id: new ObjectId(it.productId) },
+    //           update: {
+    //             $inc: { "variants.$[v].stock": -Math.abs(Number(it.qty) || 0) },
+    //           },
+    //           arrayFilters: [{ "v.label": it.variantLabel }],
+    //         },
+    //       }));
+    //     if (stockOps.length) {
+    //       await productCollection.bulkWrite(stockOps, { ordered: false });
+    //     }
+
+    //     return res.send({
+    //       ok: true,
+    //       orderId: orderResult.insertedId,
+    //       message: "Order placed successfully.",
+    //     });
+    //   } catch (err) {
+    //     console.error("POST /orders error:", err);
+    //     return res.status(500).send({ message: "Failed to place order." });
+    //   }
+    // });
 
     // *****REVIEWS RELATED API'S*******
     app.post("/review", verifyToken, async (req, res) => {
-      const data = req.body;
+      try {
+        const data = req.body;
 
-      const result = await reviewCollection.insertOne(data);
-      res.send(result);
-    });
+        // Save review
+        const result = await reviewCollection.insertOne(data);
 
-    // *********NODEMAILER*******
-    app.post("/email", async (req, res) => {
-      // console.log(req.body);
-      const messageData = req.body;
+        // Mark order as reviewed
+        if (data.orderId) {
+          await orderCollection.updateOne(
+            { _id: new ObjectId(data.orderId) },
+            { $set: { reviewed: true } }
+          );
+        }
 
-      const transporter = nodemailer.createTransport({
-        service: "gmail",
-        auth: {
-          user: process.env.USER_EMAIL,
-          pass: process.env.USER_PASS,
-        },
-      });
-
-      // Email options
-      const mailOptions = {
-        from: `${messageData.email}`,
-        to: process.env.USER_EMAIL,
-        subject: `New Message from ${messageData.name}`,
-        text: `
-        Name: ${messageData.name}
-        Email: ${messageData.email}
-        Message: ${messageData.message}
-      `,
-      };
-
-      await transporter.sendMail(mailOptions);
-
-      res.send({
-        message: "Message received, We will get back to you shortly! ",
-      });
+        res.send(result);
+      } catch (err) {
+        console.error("POST /review error:", err);
+        res.status(500).send({ message: "Failed to submit review." });
+      }
     });
 
     // ******************************* POST(END) *******************************************
@@ -644,106 +698,6 @@ async function run() {
         console.error("GET /orders failed:", err);
         res.status(500).send({ message: "Failed to fetch orders" });
       }
-    });
-
-    //  ********Registration RELATED API*********
-
-    // get all registration data
-    app.get("/registrations", verifyToken, verifyAdmin, async (req, res) => {
-      const search = req.query.search;
-      // console.log(search);
-      let query = {};
-      if (search) {
-        query = {
-          $or: [
-            { camp_name: { $regex: search, $options: "i" } },
-            {
-              payment_status: { $regex: search, $options: "i" },
-            },
-            {
-              status: { $regex: search, $options: "i" },
-            },
-            {
-              "participant.name": { $regex: search, $options: "i" },
-            },
-          ],
-        };
-      }
-      const result = await registrationCollection.find(query).toArray();
-      res.send(result);
-    });
-
-    // Registration data for logged in user
-    app.get("/registration/:email", verifyToken, async (req, res) => {
-      const email = req.params.email;
-      const search = req.query.search;
-
-      const allRegistrations = await registrationCollection
-        .find({ "participant.email": email })
-        .toArray();
-      // console.log(search);
-      const query = { "participant.email": email };
-      if (search) {
-        query.$or = [
-          {
-            camp_name: { $regex: search, $options: "i" },
-          },
-          {
-            payment_status: { $regex: search, $options: "i" },
-          },
-          {
-            status: { $regex: search, $options: "i" },
-          },
-          {
-            "participant.name": { $regex: search, $options: "i" },
-          },
-        ];
-      }
-
-      const myRegistrations = await registrationCollection
-        .find(query)
-        .toArray();
-      res.send({ allRegistrations, myRegistrations });
-    });
-
-    // registration data for payment by id
-    app.get("/registration/pay/:id", verifyToken, async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await registrationCollection.findOne(query);
-      res.send(result);
-    });
-
-    // get payment history with search
-    app.get("/payments/:email", verifyToken, async (req, res) => {
-      const email = req.params.email;
-      const search = req.query.search;
-
-      const allPayments = await paymentCollection
-        .find({ "participant.email": email })
-        .toArray();
-
-      const query = { "participant.email": email };
-
-      if (search) {
-        query.$or = [
-          {
-            camp_name: { $regex: search, $options: "i" },
-          },
-          {
-            payment_status: { $regex: search, $options: "i" },
-          },
-          {
-            status: { $regex: search, $options: "i" },
-          },
-          {
-            "participant.name": { $regex: search, $options: "i" },
-          },
-        ];
-      }
-
-      const paymentHistory = await paymentCollection.find(query).toArray();
-      res.send({ allPayments, paymentHistory });
     });
 
     // *******REVIEWS********
