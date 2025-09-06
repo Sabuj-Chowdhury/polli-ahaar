@@ -1,258 +1,299 @@
-# Digital Wallet API
+# পল্লী আহার — Polli Ahaar
 
-A production-ready REST API for a mobile/digital wallet system built with **Node.js + TypeScript**, **Express 5**, and **MongoDB (Mongoose 8)**. Includes authentication, role-based access (Admin, Agent, User), wallet accounts, and transactions.
+A modern e-commerce web app for authentic Bangladeshi grocery items — honey, rice, ghee, spices & more. Built with React + Firebase Auth on the front, Express + MongoDB Atlas on the back, and wired together with React Query for a smooth, near real-time UX.
 
-> **Live Base URL:** `https://digital-wallet-api-nu.vercel.app`
->
-> **API Base Path:** `https://digital-wallet-api-nu.vercel.app/api/v1`
-
----
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Features](#features)
-- [Tech Stack](#tech-stack)
-- [Project Structure](#project-structure)
-- [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Environment Variables](#environment-variables)
-  - [Install & Run](#install--run)
-- [Scripts](#scripts)
-- [Configuration](#configuration)
-- [Architecture](#architecture)
-- [API Reference](#api-reference)
-  - [Auth](#auth)
-  - [User](#user)
-  - [Wallet](#wallet)
-  - [Transaction](#transaction)
-  - [Agent](#agent)
-- [Error Handling](#error-handling)
-- [Security](#security)
-- [Seeding Admin](#seeding-admin)
-- [Deployment Notes](#deployment-notes)
+**Live:** https://polli-ahaar.web.app  
+**Backend API base (client env):** `VITE_URL=https://polliaharbackend.vercel.app`
 
 ---
 
-## Overview
+## 🧩 What’s inside (TL;DR)
 
-This service provides core digital wallet capabilities: user onboarding and authentication, wallet provisioning, and secure money movement operations. The API is versioned under `/api/v1` and uses JSON for request/response bodies. Cookies are used where needed for auth; CORS is enabled for browser clients.
-
-A health endpoint is available at the root for quick checks:
-
-```bash
-curl -s https://digital-wallet-api-nu.vercel.app/
-# { "success": true, "message": "welcome to Digital wallet api!" }
-```
-
----
-
-## Features
-
-- **Auth**: JWT-based access/refresh tokens, password hashing with bcrypt.
-- **RBAC**: Role-based authorization for Admin, Agent, and User.
-- **Wallets**: Create & manage user wallets (balance tracking, safe updates).
-- **Transactions**: Debit/credit flows, transfer between users, agent-assisted services.
-- **Validation**: Runtime schema validation with Zod.
-- **Error Handling**: Centralized error middleware with consistent shape.
+- 🔐 **Auth:** Firebase (Email/Password + Google) + **JWT** for backend
+- 🛒 **Cart & Orders:** variants, stock checks, place/update/cancel
+- ⭐ **Reviews:** one review per delivered order, optional **anonymous**
+- 📦 **Products:** variants, min price, stock, **orderCount** (auto-incremented)
+- 🧑‍💼 **Admin:** role-based dashboard  
+  – **Add/Manage/Delete products** ✅  
+  – **Add/Manage/Delete orders** ✅  
+  – Update order **status** (pending → processing → shipped → delivered → completed)  
+  – Search, sort, filter, paginate
+- 🖼️ **Image Upload:** via **imgbb API**, store hosted URL in DB
+- 📊 **Analytics:** `/admin-stats` for revenue, trends, top products, status mix
+- ⚡ **React Query** caching + targeted invalidation for instant UI refresh
+- 🎨 **Tailwind**, **Framer Motion**, **Headless UI**, **Recharts**, **react-fast-marquee**
+- 🔎 Powerful **product filtering** (category, brand, origin, unit, in-stock, price range, search)
 
 ---
 
-## Tech Stack
-
-- **Runtime**: Node.js
-- **Language**: TypeScript 5
-- **Framework**: Express 5
-- **Database**: MongoDB with Mongoose 8
-- **Validation**: Zod 4
-- **Auth**: jsonwebtoken, bcryptjs, cookie-parser
-- **Tooling**: ts-node-dev, ESLint
-
----
-
-## Project Structure
+## 🗃 Project Structure (high level)
 
 ```
-src/
-  app/
-    config/
-    errorHelper/
-    interface/
-    middlewares/
-      globalErrorHandler.ts
-      notFound.ts
+client/
+  src/
+    components/
+      navbar/
+      orders/
+      products/
+      modal/
+    hooks/          # useAuth, useAxiosSecure, useAxiosPublic, useAdmin, useCart
+    pages/
+      dashboard/
+        admin/
+        user/
+    sections/       # e.g. ReviewsMarquee
+    provider/
+      AuthProvider.jsx
+      CartProvider.jsx
     routes/
-      index.ts
-  modules/
-    agents/
-      agent.routes.ts
-    auth/
-      ...
-    transaction/
-      ...
-    user/
-      user.constants.ts
-      user.controller.ts
-      user.interface.ts
-      user.model.ts
-      user.route.ts
-      user.service.ts
-      user.validation.ts
-    wallet/
-      ...
-  utils/
-    jwt.ts
-    QueryBuilder.ts
-    seedAdmin.ts
-    sendResponse.ts
-    setCookie.ts
-    tryCatch.ts
-    userToken.ts
-    constants.ts
-app.ts               # Express app wiring
-server.ts            # Server bootstrap
+    context/
+  .env              # VITE_* client vars
+
+server/
+  index.js          # single-file Express app (routes + middleware)
+  .env              # ACCESS_TOKEN, DB_USER, DB_PASS, etc.
 ```
 
 ---
 
-## Getting Started
+## 🌱 Environment Setup
 
-### Prerequisites
+### Frontend — `client/.env`
 
-- Node.js 18+
-- MongoDB Atlas (or a MongoDB URI)
+```env
+# Backend API
+VITE_URL=https://polliaharbackend.vercel.app
 
-### Environment Variables
+# Firebase (use your real credentials)
+VITE_apiKey=YOUR_FIREBASE_API_KEY
+VITE_authDomain=YOUR_FIREBASE_AUTH_DOMAIN
+VITE_projectId=YOUR_FIREBASE_PROJECT_ID
+VITE_storageBucket=YOUR_FIREBASE_STORAGE_BUCKET
+VITE_messagingSenderId=YOUR_FIREBASE_SENDER_ID
+VITE_appId=YOUR_FIREBASE_APP_ID
 
-Create a `.env` file at project root:
-
-```ini
-PORT=5000
-DB_URL=<your-mongodb-uri>
-NODE_ENV=development
-
-# JWT
-JWT_ACCESS_SECRET=<access-secret>
-JWT_ACCESS_EXPIRES=1d
-JWT_REFRESH_SECRET=<refresh-secret>
-JWT_REFRESH_EXPIRES=30d
-
-# bcrypt
-BCRYPT_SALT_ROUND=10
-
-# Admin seed
-ADMIN_EMAIL=<admin@example.com>
-ADMIN_PASSWORD=<strong-password>
+# Image hosting (imgbb)
+VITE_IMGBB_KEY=YOUR_IMGBB_API_KEY
 ```
 
-### Install & Run
+### Backend — `server/.env`
+
+```env
+PORT=5000
+ACCESS_TOKEN=super_secret_jwt_key
+DB_USER=YOUR_ATLAS_USER
+DB_PASS=YOUR_ATLAS_PASS
+```
+
+---
+
+## ▶️ Running Locally
 
 ```bash
-npm install
+# backend
+cd server
+npm i
+npm run dev   # or: node index.js
+
+# frontend
+cd ../client
+npm i
 npm run dev
 ```
 
 ---
 
-## Scripts
+## 🔑 Auth & Tokens (flow)
 
-```json
-{
-  "dev": "ts-node-dev --respawn --transpile-only ./src/server.ts",
-  "test": "echo \"Error: no test specified\" && exit 1"
-}
+1. User signs in via **Firebase** (email/password or Google).
+2. `AuthProvider` observes auth state → saves/updates user in DB → requests **JWT** from `/jwt` and stores in `localStorage`.
+3. `useAxiosSecure` automatically attaches `Authorization: Bearer <token>` for protected endpoints.
+
+---
+
+## 🔌 Core API Endpoints
+
+> Base URL: `https://polliaharbackend.vercel.app` (set as `VITE_URL`)
+
+### Auth / Users
+
+- `POST /jwt` → `{ token }`
+- `POST /users` → create if new
+- `GET /user/:email` _(auth)_
+- `GET /user/admin/:email` _(auth)_ → `{ admin: boolean }`
+- `GET /users` _(admin)_ → paginated list, search & role filters
+- `PUT /user/:id/role` _(admin)_
+
+### Products
+
+- `POST /add-product` _(admin)_
+- `GET /products` → rich filters:  
+  `search, category, status, featured, origin, brand, type, unit, inStock, minPrice, maxPrice, sort, page, limit`
+- `PUT /product/:id` _(admin)_
+- `DELETE /product/:id` _(auth)_
+
+> When an order is placed, each product’s **\`orderCount\`** is auto-incremented by total qty; variant stock is decremented.
+
+### Orders
+
+- `POST /orders` _(auth)_ → items (name/label/imageUrl/price/qty) are **normalized**; totals computed server-side; **orderCount** & stock updated
+- `GET /orders/my/:email` _(auth)_ → paginated
+- `GET /orders/:id` _(auth)_
+- `GET /orders` _(admin)_ → search + status + sort + pagination
+- `PATCH /orders/:id` _(auth)_ → update shipping while pending
+- `PATCH /orders/:id/cancel` _(auth)_ → only while pending
+- `PATCH /orders/:id/status` _(admin)_ → `pending|processing|shipped|delivered|completed|cancelled`
+- `DELETE /orders/:id` _(admin)_
+
+### Reviews
+
+- `POST /review` _(auth)_ → `{ orderId, userId, name, stars|rating, text, createdAt }`  
+  Also sets `order.reviewed = true`.
+- `GET /reviews` → list all reviews for homepage marquee
+
+### Admin Analytics
+
+- `GET /admin-stats` _(admin)_ → totals, revenue, status distribution, time series, top products
+  ```json
+  {
+    "totals": { "users": 120, "products": 37, "orders": 260, "reviews": 58 },
+    "revenue": { "allTime": 145600, "last30d": 18400 },
+    "ordersByStatus": { "pending": 4, "processing": 2, "shipped": 1, "delivered": 8, "cancelled": 0, "completed": 16 },
+    "revenueByMonth": [{ "month": "2025-05", "revenue": 21900 }, ...],
+    "topProducts": [{ "_id": "...", "name": "মধু", "orderCount": 42, "minPrice": 480, "image": "..." }, ...]
+  }
+  ```
+
+---
+
+## 🧑‍💼 Admin Capabilities
+
+- **Products**
+  - ➕ Add (with image upload)
+  - ✏️ Edit (details, variants, price, stock, featured)
+  - 🗑️ Delete
+- **Orders**
+  - 🔎 Search, filter by status, paginate
+  - 🔁 Update status: `pending → processing → shipped → delivered → completed`
+  - 🛑 Cancel / 🗑️ Delete (with safeguards)
+- **Analytics**
+  - 📈 KPI cards & charts powered by `/admin-stats`
+  - 🏆 Top ordered products (by `orderCount`)
+  - 🔄 Trend lines for revenue & orders
+
+---
+
+## 🖼️ Image Upload with imgbb
+
+We use **imgbb** to host product images from the client:
+
+1. Get an API key from https://api.imgbb.com/
+2. Put it in `client/.env` as `VITE_IMGBB_KEY`
+3. Typical upload (client-side):
+
+```js
+const form = new FormData();
+form.append("image", file); // a File/Blob from input
+
+const res = await fetch(
+  `https://api.imgbb.com/1/upload?key=${import.meta.env.VITE_IMGBB_KEY}`,
+  { method: "POST", body: form }
+);
+const data = await res.json();
+const imageUrl = data?.data?.url; // store this URL in your product payload
+```
+
+> The server stores this `imageUrl` alongside product info. When orders are placed, item snapshots keep the `imageUrl` for accurate history.
+
+---
+
+## 🧠 Frontend Patterns
+
+- **React Query** for all server reads
+  - cache lists with stable keys
+  - **invalidate** after mutations (e.g., `["my-orders"]`, `["admin-orders"]`, `["order"]`, `["reviews"]`)
+  - optional **refetch on focus** for natural freshness
+- **Headless UI** for accessible modals (e.g., Review modal)
+- **Recharts** for Analytics (Area, Bar, Pie/Radial)
+- **Framer Motion** for subtle interaction polish
+- **Navbar** ready-state handling: avoids flicker by waiting for JWT and role check
+
+---
+
+## 📈 Admin Analytics UI Idea
+
+- **KPI Cards:** Total Revenue, Avg Order Value, Orders Today, New Users
+- **Area Chart:** Revenue by month (from `revenueByMonth`)
+- **Bar Chart:** Top products by `orderCount`
+- **Pie / Radial:** Order distribution by status
+- **Recent Activity:** Latest orders, latest reviews
+
+---
+
+## 🛡 Security Notes
+
+- Protected endpoints require `Authorization: Bearer <JWT>`.
+- Admin endpoints use **`verifyToken` + `verifyAdmin`**.
+- Server recomputes order totals & adjusts stock — **never trust client prices**.
+- Page size limits (`limit ≤ 100`) & query sanitization enabled.
+- Avoid leaking sensitive fields (project/omit in queries).
+
+---
+
+## 🧪 Testing Tips
+
+- Create an **admin** by setting `role: "admin"` in `users` collection.
+- Place test orders; move to **delivered**; submit a **single review** per order.
+- Confirm `orderCount` increments and variant stock decrements.
+- Try product search & filters; verify analytics reflect your changes.
+
+---
+
+## 🛠 Scripts
+
+**Frontend**
+
+```bash
+npm run dev       # local dev
+npm run build     # production build
+npm run preview   # serve build locally
+```
+
+**Backend**
+
+```bash
+npm run dev       # nodemon (if configured)
+node index.js     # start server
 ```
 
 ---
 
-## Configuration
+## 🌐 Deployment
 
-- **CORS** enabled globally.
-- **Cookies** parsed globally.
-- **JSON** body parsing enabled.
-- **Routing** under `/api/v1`.
-- **Error Handling** via middlewares.
-
----
-
-## Architecture
-
-```
-Client → Express Router → Module Router → Controller → Service → Mongoose Models → MongoDB
-```
+- **Frontend:** Firebase Hosting  
+  `npm run build` → `firebase deploy`
+- **Backend:** Vercel (Serverless)  
+  Add env vars (`ACCESS_TOKEN`, `DB_USER`, `DB_PASS`) in Vercel → deploy  
+  Expose the API base as `VITE_URL` on the client
 
 ---
 
-## API Reference
+## 🤝 Contributing
 
-### Auth
-
-**Base:** `/api/v1/auth`
-
-- **POST /login** – Login
-- **POST /logout** – Logout
-- **POST /reset-password** – Reset password (auth required)
-- **POST /refresh-token** – Refresh token
-
-### User
-
-**Base:** `/api/v1/user`
-
-- **POST /register** – Register user
-- **GET /users** – List all users (admin)
-- **PATCH /status** – Update status
-- **PATCH /:id** – Update user
-- **POST /add-money** – Add funds
-- **POST /withdraw-money** – Withdraw funds
-- **POST /send-money** – Send funds to another user
-- **GET /:slug** – Get single user
-
-### Wallet
-
-**Base:** `/api/v1/wallet`
-
-- **GET /:slug** – Get wallet by user slug
-- **GET /** – List all wallets (admin)
-
-### Transaction
-
-**Base:** `/api/v1/transaction`
-
-- **GET /all-transactions** – List all transactions (admin)
-- **GET /:slug** – List transactions for user slug
-
-### Agent
-
-**Base:** `/api/v1/agent`
-
-- **POST /cash-in** – Agent deposits money
-- **POST /cash-out** – Agent withdraws money
-- **PATCH /status** – Admin updates agent status
-- **GET /** – List all agents (admin)
+1. Fork & create a feature branch
+2. Commit with clear messages
+3. Open a PR — include screenshots for UI changes
 
 ---
 
-## Error Handling
+## 📄 License
 
-Consistent JSON structure via globalErrorHandler.
-
----
-
-## Security
-
-- JWT-based auth
-- Passwords hashed with bcrypt
-- Restrictive CORS in production
+MIT — do what you like; attribution appreciated. 🙌
 
 ---
 
-## Seeding Admin
+## 🙏 Credits
 
-Bootstrap admin via `seedAdmin.ts` using `.env` credentials.
-
----
-
-## Deployment Notes
-
-- Deployed to Vercel
-- Configure env vars per environment
+- Crafted with ❤️ for real Bangla food lovers
+- Icons: `react-icons` • Animations: `framer-motion` • Charts: `recharts`
+- Marquee: `react-fast-marquee`
