@@ -1,13 +1,16 @@
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { FiTrash2, FiMinus, FiPlus, FiShoppingBag } from "react-icons/fi";
 import useCart from "../../hooks/useCart";
-
-// const formatBDT = (n) =>
-//   Number(n || 0).toLocaleString("bn-BD", { maximumFractionDigits: 0 });
+import useAdmin from "../../hooks/useAdmin";
 
 const CartPage = () => {
   const { items, removeItem, setQty, subtotal, clearCart } = useCart();
   const totalItems = items.reduce((s, i) => s + i.qty, 0);
+
+  const navigate = useNavigate();
+
+  // check role
+  const { isAdmin, isLoading: adminLoading } = useAdmin();
 
   if (!items.length) {
     return (
@@ -170,7 +173,6 @@ const CartPage = () => {
                 <span className="text-gray-600">সাবটোটাল</span>
                 <span className="hind-siliguri-medium">৳ {subtotal}</span>
               </div>
-              {/* Add shipping / discount here if needed */}
               <div className="border-t border-green-200 pt-2 flex justify-between text-base">
                 <span className="hind-siliguri-medium">মোট পরিশোধ</span>
                 <span className="hind-siliguri-medium text-green-700">
@@ -179,15 +181,36 @@ const CartPage = () => {
               </div>
             </div>
 
+            {/* Order button — disabled for admin */}
             <button
-              className="mt-4 w-full rounded-xl bg-green-600 px-4 py-2 text-white hover:bg-green-700 transition"
+              type="button"
+              disabled={!adminLoading && isAdmin} // only disable when we know it's an admin
+              aria-disabled={!adminLoading && isAdmin}
+              title={
+                !adminLoading && isAdmin
+                  ? "অ্যাডমিন হিসেবে অর্ডার করা যাবে না"
+                  : "অর্ডার করুন"
+              }
+              className={`mt-4 w-full rounded-xl px-4 py-2 transition ${
+                !adminLoading && isAdmin
+                  ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                  : "bg-green-600 text-white hover:bg-green-700"
+              }`}
               onClick={() => {
-                // route to checkout if you have one
-                // navigate("/checkout");
+                if (!isAdmin) {
+                  navigate("/checkout");
+                }
               }}
             >
               অর্ডার করুন
             </button>
+
+            {!adminLoading && isAdmin && (
+              <p className="mt-2 text-[12px] text-amber-700">
+                নোট: অ্যাডমিন একাউন্ট দিয়ে অর্ডার করা নিষ্ক্রিয়। দয়া করে
+                সাধারণ ক্রেতা একাউন্ট ব্যবহার করুন।
+              </p>
+            )}
 
             <p className="mt-3 text-[12px] text-gray-500">
               অর্ডার করার আগে পরিমাণ ও ভ্যারিয়েন্ট যাচাই করুন।

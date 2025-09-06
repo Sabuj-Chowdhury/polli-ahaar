@@ -1,11 +1,35 @@
-// src/sections/ReviewsMarquee.jsx
 import Marquee from "react-fast-marquee";
 import { motion } from "motion/react";
+import { useQuery } from "@tanstack/react-query";
+import useAxiosPublic from "../../hooks/useAxiosPublic";
 
 export const ReviewsMarquee = () => {
+  const axiosPublic = useAxiosPublic();
+
+  // Query reviews from backend
+  const {
+    data: reviews,
+    isLoading,
+    isError,
+  } = useQuery({
+    queryKey: ["reviews"],
+    queryFn: async () => {
+      const res = await axiosPublic.get("/reviews"); // ✅ use axiosPublic
+      return res.data;
+    },
+    staleTime: 60_000, // cache for 1 min
+    refetchOnWindowFocus: false,
+  });
+
+  // Fallback seed data
+  const list =
+    !isError && Array.isArray(reviews) && reviews.length > 0
+      ? reviews
+      : SEED_REVIEWS;
+
   return (
     <section className="bg-gradient-to-r from-emerald-50 via-white to-emerald-50 py-10">
-      <div className=" px-4 py-5 sm:py-10">
+      <div className="px-4 py-5 sm:py-10">
         {/* Heading */}
         <motion.h2
           initial={{ opacity: 0, y: 12 }}
@@ -17,34 +41,50 @@ export const ReviewsMarquee = () => {
           ক্রেতারা যা বলছেন ✨
         </motion.h2>
 
-        {/* Marquee */}
-        <Marquee
-          gradient={false}
-          speed={45}
-          pauseOnHover={true}
-          pauseOnClick={true}
-        >
-          {REVIEWS.map((r, i) => (
-            <motion.div
-              key={i}
-              whileHover={{ scale: 1.04 }}
-              className="shrink-0 w-[280px] sm:w-[320px] mx-2 sm:mx-3 rounded-2xl border border-green-100 bg-white shadow-sm hover:shadow-md p-4 transition"
-            >
-              <div className="hind-siliguri-medium text-green-700 text-sm mb-1">
-                ★ {r.stars || r.rating} — {r.name}
+        {/* Loading skeleton */}
+        {isLoading ? (
+          <div className="mx-auto max-w-5xl grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-28 rounded-2xl border border-green-100 bg-white"
+              >
+                <div className="h-full w-full animate-pulse bg-gray-100 rounded-2xl" />
               </div>
-              <div className="hind-siliguri-regular text-gray-600 text-sm leading-snug line-clamp-4">
-                {r.text}
-              </div>
-            </motion.div>
-          ))}
-        </Marquee>
+            ))}
+          </div>
+        ) : (
+          <Marquee gradient={false} speed={45} pauseOnHover pauseOnClick>
+            {list.map((r, i) => {
+              const starVal = r.stars ?? r.rating ?? 5;
+              const starText = Number(starVal).toFixed
+                ? Number(starVal).toFixed(1)
+                : String(starVal);
+
+              return (
+                <motion.div
+                  key={i}
+                  whileHover={{ scale: 1.04 }}
+                  className="shrink-0 w-[280px] sm:w-[320px] mx-2 sm:mx-3 rounded-2xl border border-green-100 bg-white shadow-sm hover:shadow-md p-4 transition"
+                >
+                  <div className="hind-siliguri-medium text-green-700 text-sm mb-1 truncate">
+                    ★ {starText} — {r.name || "Anonymous"}
+                  </div>
+                  <div className="hind-siliguri-regular text-gray-600 text-sm leading-snug line-clamp-4">
+                    {r.text || ""}
+                  </div>
+                </motion.div>
+              );
+            })}
+          </Marquee>
+        )}
       </div>
     </section>
   );
 };
 
-const REVIEWS = [
+// Fallback reviews if API empty/error
+const SEED_REVIEWS = [
   {
     name: "তানভীর",
     stars: "5.0",

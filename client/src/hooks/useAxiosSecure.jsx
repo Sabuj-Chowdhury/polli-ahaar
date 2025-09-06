@@ -1,3 +1,4 @@
+// src/hooks/useAxiosSecure.js
 import axios from "axios";
 import useAuth from "./useAuth";
 import { useNavigate } from "react-router";
@@ -9,31 +10,32 @@ const axiosSecure = axios.create({
 const useAxiosSecure = () => {
   const { logOut } = useAuth();
   const navigate = useNavigate();
-  // intercept request
+
   axiosSecure.interceptors.request.use(
-    (confiq) => {
+    (config) => {
       const token = localStorage.getItem("token");
-      confiq.headers.authorization = `bearer ${token}`;
-      return confiq;
+      if (token) {
+        config.headers.authorization = `Bearer ${token}`;
+      } else {
+        delete config.headers.authorization;
+      }
+      return config;
     },
-    (err) => {
-      return Promise.reject(err);
-    }
+    (err) => Promise.reject(err)
   );
 
-  // intercept response
   axiosSecure.interceptors.response.use(
-    (response) => {
-      return response;
-    },
+    (res) => res,
     async (err) => {
-      const status = err.response.status;
-      await logOut();
-
+      const status = err?.response?.status;
       if (status === 401 || status === 403) {
+        // token invalid/expired — clear and send to login
+        localStorage.removeItem("token");
+        try {
+          await logOut();
+        } catch {}
         navigate("/login");
       }
-
       return Promise.reject(err);
     }
   );

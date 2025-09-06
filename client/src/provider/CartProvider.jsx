@@ -1,38 +1,38 @@
-// CartProvider.jsx
-import { useEffect, useReducer } from "react";
+// providers/CartProvider.jsx
+import { useEffect, useReducer, useRef } from "react";
 import toast from "react-hot-toast";
 import CartContext from "../context/CartContext";
 
-const initialState = {
-  items: [],
-};
+const CART_KEY = "polli:cart:v1";
+
+const initialState = { items: [] };
 
 function cartReducer(state, action) {
   switch (action.type) {
     case "HYDRATE":
-      return { ...state, items: action.payload || [] };
+      return {
+        ...state,
+        items: Array.isArray(action.payload) ? action.payload : [],
+      };
 
     case "ADD_ITEM": {
       const { item } = action;
-      const existingIndex = state.items.findIndex(
+      const idx = state.items.findIndex(
         (i) => i.id === item.id && i.variantLabel === item.variantLabel
       );
-
-      // if item exists, bump qty but cap at stock
-      if (existingIndex !== -1) {
-        const existing = state.items[existingIndex];
-        const newQty = Math.min(existing.qty + item.qty, existing.stock);
-        const updated = { ...existing, qty: newQty };
+      if (idx !== -1) {
+        const cur = state.items[idx];
+        const newQty = Math.min(cur.qty + item.qty, cur.stock);
+        const updated = { ...cur, qty: newQty };
         return {
           ...state,
           items: [
-            ...state.items.slice(0, existingIndex),
+            ...state.items.slice(0, idx),
             updated,
-            ...state.items.slice(existingIndex + 1),
+            ...state.items.slice(idx + 1),
           ],
         };
       }
-      // fresh add
       return { ...state, items: [...state.items, item] };
     }
 
@@ -64,35 +64,62 @@ function cartReducer(state, action) {
   }
 }
 
+// ✅ lazy initializer reads localStorage synchronously (no race)
+function initFromStorage() {
+  try {
+    const raw = localStorage.getItem(CART_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    return { items: Array.isArray(parsed) ? parsed : [] };
+  } catch {
+    return initialState;
+  }
+}
+
 export const CartProvider = ({ children }) => {
-  const [state, dispatch] = useReducer(cartReducer, initialState);
+  const [state, dispatch] = useReducer(
+    cartReducer,
+    initialState,
+    initFromStorage
+  );
 
-  // Hydrate from localStorage on mount
+  // flag to skip the first persist (not needed with lazy init,
+  // but keeps us safe in StrictMode double-invocation)
+  const hasMountedRef = useRef(false);
+
+  // Persist whenever items change (after first mount)
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("cart");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          dispatch({ type: "HYDRATE", payload: parsed });
-        }
-      }
-    } catch {
-      // ignore corrupt storage
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      return;
     }
-  }, []);
-
-  // Persist to localStorage
-  useEffect(() => {
-    localStorage.setItem("cart", JSON.stringify(state.items));
+    try {
+      localStorage.setItem(CART_KEY, JSON.stringify(state.items));
+    } catch {
+      /* ignore quota errors */
+    }
   }, [state.items]);
 
-  // Derived values
-  const count = state.items.reduce((sum, i) => sum + i.qty, 0);
-  const subtotal = state.items.reduce((sum, i) => sum + i.qty * i.price, 0);
+  // Cross-tab sync (if another tab modifies the cart)
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (e.key === CART_KEY) {
+        try {
+          const next = e.newValue ? JSON.parse(e.newValue) : [];
+          dispatch({ type: "HYDRATE", payload: next });
+        } catch {}
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
-  // Helpers
+  // Derived values
+  const count = state.items.reduce((s, i) => s + i.qty, 0);
+  const subtotal = state.items.reduce((s, i) => s + i.qty * i.price, 0);
+
+  // Actions
   const addItem = (product, variant, qty = 1) => {
+    // allow single-variant products where variant might be passed in already
     if (!variant) {
       toast.error("ভ্যারিয়েন্ট নির্বাচন করুন।");
       return;
@@ -110,7 +137,7 @@ export const CartProvider = ({ children }) => {
         id: product._id,
         name: product.name,
         image: product.image,
-        variantLabel: variant.label,
+        variantLabel: variant.label ?? null,
         unit: variant.unit,
         price: Number(variant.price) || 0,
         stock,
@@ -118,7 +145,6 @@ export const CartProvider = ({ children }) => {
       },
     });
 
-    // find existing item (post-dispatch state not available here; show optimistic toast)
     const label = variant.label ? ` (${variant.label})` : "";
     toast.success(`${product.name}${label} কার্টে যোগ হয়েছে!`);
   };
@@ -133,11 +159,8 @@ export const CartProvider = ({ children }) => {
       (i) => i.id === id && i.variantLabel === variantLabel
     );
     if (!item) return;
-
     const n = Number(qty) || 1;
-    if (n > item.stock) {
-      toast.error(`স্টকে আছে মাত্র ${item.stock} টি।`);
-    }
+    if (n > item.stock) toast.error(`স্টকে আছে মাত্র ${item.stock} টি।`);
     dispatch({ type: "SET_QTY", id, variantLabel, qty: n });
   };
 

@@ -1,3 +1,4 @@
+// src/components/navbar/Navbar.jsx
 import { Link, NavLink, useNavigate } from "react-router";
 import {
   AiOutlineClose,
@@ -9,11 +10,15 @@ import logo from "../../assets/logo.jpg";
 import useAuth from "../../hooks/useAuth";
 import toast from "react-hot-toast";
 import useCart from "../../hooks/useCart";
+import useAdmin from "../../hooks/useAdmin";
 
 const Navbar = ({ cartCount = 0 }) => {
   const { user, logOut } = useAuth();
   const { count } = useCart();
   const navigate = useNavigate();
+
+  // 🔐 role check (runs only when user?.email exists)
+  const { isAdmin, isLoading: adminLoading } = useAdmin();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -54,6 +59,9 @@ const Navbar = ({ cartCount = 0 }) => {
     }
     return () => (document.body.style.overflow = "");
   }, [menuOpen]);
+
+  // convenience: computed cart bubble (prefer context count if present)
+  const bubbleCount = typeof count === "number" ? count : cartCount;
 
   return (
     <header className="bg-gradient-to-r from-green-50 via-green-100 to-green-50 text-gray-800 sticky top-0 z-50 shadow-md">
@@ -130,16 +138,15 @@ const Navbar = ({ cartCount = 0 }) => {
 
         {/* Right cluster (desktop): Cart + Auth */}
         <div className="hidden md:flex items-center gap-3">
-          {/* Cart (icon) */}
-
+          {/* Cart */}
           <Link
             to="/cart"
             className="relative inline-flex items-center rounded-xl border border-green-200 bg-white p-2 hover:bg-green-50 hover:text-green-700 transition"
           >
             <AiOutlineShoppingCart size={20} />
-            {count > 0 && (
+            {bubbleCount > 0 && (
               <span className="absolute -top-1 -right-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-green-600 text-white text-xs px-1 hind-siliguri-regular">
-                {count}
+                {bubbleCount}
               </span>
             )}
           </Link>
@@ -168,7 +175,7 @@ const Navbar = ({ cartCount = 0 }) => {
               {dropdownOpen && (
                 <div
                   role="menu"
-                  className="absolute right-0 mt-2 w-48 rounded-xl border border-green-200 bg-white text-gray-800 shadow-lg overflow-hidden"
+                  className="absolute right-0 mt-2 w-56 rounded-xl border border-green-200 bg-white text-gray-800 shadow-lg overflow-hidden"
                 >
                   <div className="px-4 py-3 text-sm">
                     <p className="noto-serif-bengali-normal truncate">
@@ -179,22 +186,39 @@ const Navbar = ({ cartCount = 0 }) => {
                     </p>
                   </div>
                   <div className="border-t border-green-200" />
-                  <NavLink
-                    to="/dashboard/profile"
-                    className="block px-4 py-2 text-sm hover:bg-green-50 hind-siliguri-regular"
-                    onClick={() => setDropdownOpen(false)}
-                  >
-                    প্রোফাইল
-                  </NavLink>
-                  {user.role === "user" && (
-                    <NavLink
-                      to="/dashboard/orders"
-                      className="block px-4 py-2 text-sm hover:bg-green-50 hind-siliguri-regular"
-                      onClick={() => setDropdownOpen(false)}
-                    >
-                      আমার অর্ডার
-                    </NavLink>
+
+                  {/* Role-based entries (only render when role is known) */}
+                  {!adminLoading && (
+                    <>
+                      {isAdmin ? (
+                        <NavLink
+                          to="/dashboard/manage-order"
+                          className="block px-4 py-2 text-sm hover:bg-green-50 hind-siliguri-regular"
+                          onClick={() => setDropdownOpen(false)}
+                        >
+                          ড্যাশবোর্ড
+                        </NavLink>
+                      ) : (
+                        <NavLink
+                          to="/dashboard/my-orders"
+                          className="block px-4 py-2 text-sm hover:bg-green-50 hind-siliguri-regular"
+                          onClick={() => setDropdownOpen(false)}
+                        >
+                          আমার অর্ডার
+                        </NavLink>
+                      )}
+
+                      {/* Common: Profile */}
+                      <NavLink
+                        to="/dashboard/profile"
+                        className="block px-4 py-2 text-sm hover:bg-green-50 hind-siliguri-regular"
+                        onClick={() => setDropdownOpen(false)}
+                      >
+                        প্রোফাইল
+                      </NavLink>
+                    </>
                   )}
+
                   <button
                     onClick={onLogout}
                     className="block w-full text-left px-4 py-2 text-sm hover:bg-green-50 hind-siliguri-regular"
@@ -216,7 +240,6 @@ const Navbar = ({ cartCount = 0 }) => {
 
         {/* Mobile: cart + avatar + hamburger */}
         <div className="md:hidden flex items-center gap-2">
-          {/* Cart icon (mobile quick access) */}
           <Link
             to="/cart"
             className="relative inline-flex items-center rounded-xl border border-green-200 bg-white p-2 hover:bg-green-50 hover:text-green-700 transition"
@@ -224,9 +247,9 @@ const Navbar = ({ cartCount = 0 }) => {
             title="কার্ট"
           >
             <AiOutlineShoppingCart size={22} />
-            {cartCount > 0 && (
+            {bubbleCount > 0 && (
               <span className="absolute -top-1 -right-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-green-600 text-white text-[10px] px-1 hind-siliguri-regular">
-                {cartCount}
+                {bubbleCount}
               </span>
             )}
           </Link>
@@ -278,28 +301,46 @@ const Navbar = ({ cartCount = 0 }) => {
             </p>
           </div>
           <div className="border-t border-green-200" />
-          <NavLink
-            to="/dashboard/profile"
-            className="block px-4 py-2 hover:bg-green-50 hind-siliguri-regular"
-            onClick={() => {
-              setDropdownOpen(false);
-              setMenuOpen(false);
-            }}
-          >
-            প্রোফাইল
-          </NavLink>
-          {user.role === "user" && (
-            <NavLink
-              to="/dashboard/orders"
-              className="block px-4 py-2 hover:bg-green-50 hind-siliguri-regular"
-              onClick={() => {
-                setDropdownOpen(false);
-                setMenuOpen(false);
-              }}
-            >
-              আমার অর্ডার
-            </NavLink>
+
+          {!adminLoading && (
+            <>
+              {isAdmin ? (
+                <NavLink
+                  to="/dashboard/manage-order"
+                  className="block px-4 py-2 hover:bg-green-50 hind-siliguri-regular"
+                  onClick={() => {
+                    setDropdownOpen(false);
+                    setMenuOpen(false);
+                  }}
+                >
+                  ড্যাশবোর্ড
+                </NavLink>
+              ) : (
+                <NavLink
+                  to="/dashboard/my-orders"
+                  className="block px-4 py-2 hover:bg-green-50 hind-siliguri-regular"
+                  onClick={() => {
+                    setDropdownOpen(false);
+                    setMenuOpen(false);
+                  }}
+                >
+                  আমার অর্ডার
+                </NavLink>
+              )}
+
+              <NavLink
+                to="/dashboard/profile"
+                className="block px-4 py-2 hover:bg-green-50 hind-siliguri-regular"
+                onClick={() => {
+                  setDropdownOpen(false);
+                  setMenuOpen(false);
+                }}
+              >
+                প্রোফাইল
+              </NavLink>
+            </>
           )}
+
           <button
             onClick={onLogout}
             className="block w-full text-left px-4 py-2 hover:bg-green-50 hind-siliguri-regular"
@@ -310,7 +351,7 @@ const Navbar = ({ cartCount = 0 }) => {
       )}
 
       {/* ===== Mobile RIGHT-SIDE DRAWER ===== */}
-      {/* Backdrop (fade + slight blur) */}
+      {/* Backdrop */}
       <div
         className={`md:hidden fixed inset-0 z-[60] bg-black/40 backdrop-blur-[1px] transition-opacity duration-300 ${
           menuOpen
@@ -321,15 +362,14 @@ const Navbar = ({ cartCount = 0 }) => {
         aria-hidden="true"
       />
 
-      {/* Drawer (right, with smooth slide) */}
+      {/* Drawer */}
       <aside
-        className={`md:hidden fixed right-0 top--70 z-[61] h-full w-1/2 max-w-xs bg-gradient-to-r from-green-50 via-green-100 to-green-50 text-gray-800  shadow-xl will-change-transform transform transition-transform duration-300 ease-in-out ${
+        className={`md:hidden fixed right-0 top--70 z-[61] h-full w-1/2 max-w-xs bg-gradient-to-r from-green-50 via-green-100 to-green-50 text-gray-800 shadow-xl will-change-transform transform transition-transform duration-300 ease-in-out ${
           menuOpen ? "translate-x-0" : "translate-x-full"
         }`}
         role="dialog"
         aria-modal="true"
       >
-        {/* Optional small brand area (no close button inside) */}
         <div className="flex items-center gap-2 px-4 py-3 border-b border-green-200">
           <img
             src={logo}
@@ -339,7 +379,6 @@ const Navbar = ({ cartCount = 0 }) => {
           <span className="noto-serif-bengali-normal text-lg">পল্লী আহার</span>
         </div>
 
-        {/* Drawer content with subtle fade/slide-in */}
         <div
           className={`flex flex-col items-stretch px-2 py-2 hind-siliguri-medium transition-all duration-300 ${
             menuOpen ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
@@ -359,7 +398,6 @@ const Navbar = ({ cartCount = 0 }) => {
           >
             পণ্যসমূহ
           </NavLink>
-
           <NavLink
             to="/about"
             className="px-3 py-3 rounded-md hover:bg-green-100 hover:text-green-700 transition"
@@ -367,7 +405,6 @@ const Navbar = ({ cartCount = 0 }) => {
           >
             আমাদের সম্পর্কে
           </NavLink>
-
           <NavLink
             to="/contact"
             className="px-3 py-3 rounded-md hover:bg-green-100 hover:text-green-700 transition"
@@ -379,21 +416,33 @@ const Navbar = ({ cartCount = 0 }) => {
           {user && (
             <>
               <div className="my-2 mx-3 border-t border-green-200" />
-              <NavLink
-                to="/dashboard/profile"
-                className="px-3 py-3 rounded-md hover:bg-green-100 hover:text-green-700 transition"
-                onClick={() => setMenuOpen(false)}
-              >
-                প্রোফাইল
-              </NavLink>
-              {user.role === "user" && (
-                <NavLink
-                  to="/dashboard/orders"
-                  className="px-3 py-3 rounded-md hover:bg-green-100 hover:text-green-700 transition"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  আমার অর্ডার
-                </NavLink>
+              {!adminLoading && (
+                <>
+                  {isAdmin ? (
+                    <NavLink
+                      to="/dashboard/manage-order"
+                      className="px-3 py-3 rounded-md hover:bg-green-100 hover:text-green-700 transition"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      ড্যাশবোর্ড
+                    </NavLink>
+                  ) : (
+                    <NavLink
+                      to="/dashboard/my-orders"
+                      className="px-3 py-3 rounded-md hover:bg-green-100 hover:text-green-700 transition"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      আমার অর্ডার
+                    </NavLink>
+                  )}
+                  <NavLink
+                    to="/dashboard/profile"
+                    className="px-3 py-3 rounded-md hover:bg-green-100 hover:text-green-700 transition"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    প্রোফাইল
+                  </NavLink>
+                </>
               )}
               <button
                 onClick={() => {

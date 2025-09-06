@@ -153,6 +153,7 @@ const AddProduct = () => {
         variants,
         status: data.status,
         featured: !!data.featured,
+        orderCount: 0,
       };
 
       await axiosSecure.post("/add-product", payload);

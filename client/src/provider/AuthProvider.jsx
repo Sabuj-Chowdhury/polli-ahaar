@@ -54,26 +54,32 @@ const AuthProvider = ({ children }) => {
 
   // observer from firebase
   // onAuthStateChange
+  // observer from firebase
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
-      if (currentUser?.displayName && currentUser.photoURL) {
+
+      if (currentUser?.email) {
         console.log("CurrentUser-->", currentUser.email);
 
         const user = {
-          email: currentUser?.email,
-          name: currentUser?.displayName,
-          image: currentUser.photoURL,
+          email: currentUser.email,
+          name: currentUser.displayName || "", // allow empty
+          image: currentUser.photoURL || "", // allow empty
         };
 
-        // save user data in te DB
-        await axiosPublic.post("/users", user);
-
-        const userInfo = { email: currentUser?.email };
-
-        // get token and store in localstorage
+        // save user in DB
         try {
-          const res = await axiosPublic.post("/jwt", userInfo);
+          await axiosPublic.post("/users", user);
+        } catch (err) {
+          console.error("Error saving user:", err);
+        }
+
+        // always fetch JWT if email exists
+        try {
+          const res = await axiosPublic.post("/jwt", {
+            email: currentUser.email,
+          });
           if (res.data.token) {
             localStorage.setItem("token", res.data.token);
           }
@@ -82,15 +88,15 @@ const AuthProvider = ({ children }) => {
           localStorage.removeItem("token");
         }
       } else {
-        // if no user logged in
+        // no user logged in
         localStorage.removeItem("token");
         console.log("CurrentUser-->", null);
       }
+
       setLoading(false);
     });
-    return () => {
-      return unsubscribe();
-    };
+
+    return () => unsubscribe();
   }, [axiosPublic]);
 
   // console.log(user);

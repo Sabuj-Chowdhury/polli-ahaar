@@ -2,14 +2,15 @@ import { useState } from "react";
 import { NavLink, useNavigate } from "react-router";
 import { AiOutlineHome } from "react-icons/ai";
 import { BiLogOut } from "react-icons/bi";
-import { IoMdAddCircleOutline, IoMdListBox } from "react-icons/io";
+import { IoMdAddCircleOutline } from "react-icons/io";
 import { ImProfile } from "react-icons/im";
 import { IoAnalyticsSharp } from "react-icons/io5";
 import { MdManageSearch } from "react-icons/md";
-import { FaReceipt, FaTasks, FaUsers } from "react-icons/fa";
+import { FaTasks, FaUsers } from "react-icons/fa";
 import useAuth from "../../hooks/useAuth";
 import useAdmin from "../../hooks/useAdmin";
 import toast from "react-hot-toast";
+import { FiPackage } from "react-icons/fi";
 
 const SideBar = () => {
   const { logOut } = useAuth();
@@ -59,7 +60,6 @@ const SideBar = () => {
       <nav className="flex flex-col gap-2 p-3">
         {isAdmin ? (
           <>
-            {/* Admin section */}
             {!isCollapsed && (
               <div className="mt-1 mb-1 px-3 text-xs text-gray-500">
                 অ্যাডমিন
@@ -68,6 +68,7 @@ const SideBar = () => {
 
             <NavLink
               to="/dashboard/add-product"
+              end
               className={({ isActive }) =>
                 `${baseItem} ${isActive ? activeItem : ""}`
               }
@@ -82,6 +83,7 @@ const SideBar = () => {
 
             <NavLink
               to="/dashboard/manage-products"
+              end
               className={({ isActive }) =>
                 `${baseItem} ${isActive ? activeItem : ""}`
               }
@@ -94,6 +96,7 @@ const SideBar = () => {
 
             <NavLink
               to="/dashboard/manage-order"
+              end
               className={({ isActive }) =>
                 `${baseItem} ${isActive ? activeItem : ""}`
               }
@@ -108,11 +111,12 @@ const SideBar = () => {
 
             <NavLink
               to="/dashboard/manage-users"
+              end
               className={({ isActive }) =>
                 `${baseItem} ${isActive ? activeItem : ""}`
               }
             >
-              <FaUsers size={18} /> {/* 👈 use user-related icon */}
+              <FaUsers size={18} />
               {!isCollapsed && (
                 <span className="hind-siliguri-medium">ইউজার ম্যানেজমেন্ট</span>
               )}
@@ -120,6 +124,7 @@ const SideBar = () => {
 
             <NavLink
               to="/dashboard/admin-analytics"
+              end
               className={({ isActive }) =>
                 `${baseItem} ${isActive ? activeItem : ""}`
               }
@@ -132,7 +137,6 @@ const SideBar = () => {
           </>
         ) : (
           <>
-            {/* User section */}
             {!isCollapsed && (
               <div className="mt-1 mb-1 px-3 text-xs text-gray-500">
                 আমার অ্যাকাউন্ট
@@ -140,38 +144,15 @@ const SideBar = () => {
             )}
 
             <NavLink
-              to="/dashboard/analytics"
+              to="/dashboard/my-orders"
+              end
               className={({ isActive }) =>
                 `${baseItem} ${isActive ? activeItem : ""}`
               }
             >
-              <IoAnalyticsSharp size={20} />
+              <FiPackage size={20} />
               {!isCollapsed && (
-                <span className="hind-siliguri-medium">অ্যানালিটিক্স</span>
-              )}
-            </NavLink>
-
-            <NavLink
-              to="/dashboard/registered-camps"
-              className={({ isActive }) =>
-                `${baseItem} ${isActive ? activeItem : ""}`
-              }
-            >
-              <IoMdListBox size={20} />
-              {!isCollapsed && (
-                <span className="hind-siliguri-medium">আমার তালিকা</span>
-              )}
-            </NavLink>
-
-            <NavLink
-              to="/dashboard/payment-history"
-              className={({ isActive }) =>
-                `${baseItem} ${isActive ? activeItem : ""}`
-              }
-            >
-              <FaReceipt size={18} />
-              {!isCollapsed && (
-                <span className="hind-siliguri-medium">পেমেন্ট হিস্ট্রি</span>
+                <span className="hind-siliguri-medium">আমার অর্ডার</span>
               )}
             </NavLink>
           </>
@@ -180,6 +161,7 @@ const SideBar = () => {
         {/* Common */}
         <NavLink
           to="/dashboard"
+          end // ✅ only active at exactly /dashboard
           className={({ isActive }) =>
             `${baseItem} ${isActive ? activeItem : ""}`
           }
@@ -192,6 +174,7 @@ const SideBar = () => {
 
         <NavLink
           to="/"
+          end // ✅ only active at exactly /
           className={({ isActive }) =>
             `${baseItem} ${isActive ? activeItem : ""}`
           }

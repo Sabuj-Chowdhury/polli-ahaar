@@ -17,6 +17,11 @@ import AllProducts from "../pages/allProducts/AllProducts";
 import CartPage from "../pages/cart/CartPage";
 import AboutUs from "../pages/aboutUs/AboutUs";
 import Contact from "../pages/contact/Contact";
+import UserRoutes from "./UserRoutes";
+import Checkout from "../pages/cart/Checkout";
+import OrderSuccess from "../components/order/OrderSuccess";
+import MyOrders from "../pages/dashbooard/user/MyOrders";
+import OrderDetails from "../pages/dashbooard/user/OrderDetails";
 
 const router = createBrowserRouter([
   {
@@ -34,7 +39,11 @@ const router = createBrowserRouter([
       },
       {
         path: "cart",
-        element: <CartPage />,
+        element: (
+          <PrivateRoute>
+            <CartPage />
+          </PrivateRoute>
+        ),
       },
       {
         path: "about",
@@ -43,6 +52,26 @@ const router = createBrowserRouter([
       {
         path: "contact",
         element: <Contact />,
+      },
+      {
+        path: "checkout",
+        element: (
+          <PrivateRoute>
+            <UserRoutes>
+              <Checkout />
+            </UserRoutes>
+          </PrivateRoute>
+        ),
+      },
+      {
+        path: "order-success",
+        element: (
+          <PrivateRoute>
+            <UserRoutes>
+              <OrderSuccess />
+            </UserRoutes>
+          </PrivateRoute>
+        ),
       },
     ],
   },
@@ -122,6 +151,24 @@ const router = createBrowserRouter([
             <AdminRoutes>
               <ManageUsers />
             </AdminRoutes>
+          </PrivateRoute>
+        ),
+      },
+      {
+        path: "my-orders",
+        element: (
+          <PrivateRoute>
+            <UserRoutes>
+              <MyOrders />
+            </UserRoutes>
+          </PrivateRoute>
+        ),
+      },
+      {
+        path: "my-orders/:id",
+        element: (
+          <PrivateRoute>
+            <OrderDetails />
           </PrivateRoute>
         ),
       },
