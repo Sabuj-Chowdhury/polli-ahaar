@@ -998,6 +998,50 @@ async function run() {
       }
     });
 
+    // ✅ Update order status (admin)
+    app.patch(
+      "/orders/:id/status",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        try {
+          const id = req.params.id;
+          const { status } = req.body || {};
+          const allowed = [
+            "pending",
+            "processing",
+            "shipped",
+            "delivered",
+            "completed",
+            "cancelled",
+          ];
+          if (!ObjectId.isValid(id)) {
+            return res.status(400).send({ message: "Invalid order ID" });
+          }
+          if (!allowed.includes(String(status || "").toLowerCase())) {
+            return res.status(400).send({ message: "Invalid status" });
+          }
+
+          const query = { _id: new ObjectId(id) };
+          const update = {
+            $set: { status: status.toLowerCase(), updatedAt: new Date() },
+          };
+
+          const result = await orderCollection.updateOne(query, update);
+          if (result.matchedCount === 0) {
+            return res.status(404).send({ message: "Order not found" });
+          }
+          res.send({
+            message: "Status updated",
+            modifiedCount: result.modifiedCount,
+          });
+        } catch (err) {
+          console.error("PATCH /orders/:id/status failed:", err);
+          res.status(500).send({ message: "Failed to update status" });
+        }
+      }
+    );
+
     //  ********Registration RELATED API*********
     // update status in both registration collection and payment collection
     app.patch(
@@ -1035,15 +1079,6 @@ async function run() {
 
     // ******************************* DELETE(START) *****************************************
 
-    // ********REGISTRATION RELATED API'S************
-    // cancel/delete registration
-    app.delete("/registration/:id", verifyToken, async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await registrationCollection.deleteOne(query);
-      res.send(result);
-    });
-
     // ********Product RELATED API'S************
     // delete product
     app.delete("/product/:id", verifyToken, async (req, res) => {
@@ -1051,6 +1086,30 @@ async function run() {
       const query = { _id: new ObjectId(id) };
       const result = await productCollection.deleteOne(query);
       res.send(result);
+    });
+
+    // ******** ORDER related API's **************
+    // ✅ Delete order (admin)
+    app.delete("/orders/:id", verifyToken, verifyAdmin, async (req, res) => {
+      try {
+        const id = req.params.id;
+        if (!ObjectId.isValid(id)) {
+          return res.status(400).send({ message: "Invalid order ID" });
+        }
+        const result = await orderCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+        if (result.deletedCount === 0) {
+          return res.status(404).send({ message: "Order not found" });
+        }
+        res.send({
+          message: "Order deleted",
+          deletedCount: result.deletedCount,
+        });
+      } catch (err) {
+        console.error("DELETE /orders/:id failed:", err);
+        res.status(500).send({ message: "Failed to delete order" });
+      }
     });
 
     // ******************************* DELETE(END) *******************************************
