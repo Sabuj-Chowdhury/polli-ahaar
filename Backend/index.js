@@ -238,97 +238,6 @@ async function run() {
       }
     });
 
-    // Body shape:
-    // {
-    //   items: [
-    //     { productId: "66b11...abc", variantLabel: "১ কেজি", price: 140, qty: 2 },
-    //     { productId: "66b22...def", variantLabel: "500g",  price: 210, qty: 1 }
-    //   ],
-    //   shipping: { name, phone, address, note },   // whatever you collect
-    //   payment:  { method: "COD" }                 // optional
-    // }
-    // app.post("/orders", verifyToken, async (req, res) => {
-    //   try {
-    //     const { items, shipping = {}, payment = {} } = req.body;
-
-    //     // --- basic validations ---
-    //     if (!Array.isArray(items) || items.length === 0) {
-    //       return res.status(400).send({ message: "No items provided." });
-    //     }
-    //     for (const it of items) {
-    //       if (!it.productId || !ObjectId.isValid(it.productId) || !it.qty) {
-    //         return res.status(400).send({ message: "Invalid item payload." });
-    //       }
-    //     }
-
-    //     // --- compute totals (server-side safety) ---
-    //     const subtotal = items.reduce(
-    //       (s, it) => s + Number(it.price || 0) * Number(it.qty || 0),
-    //       0
-    //     );
-    //     const grandTotal = subtotal; // add delivery charge/discount here if you have
-
-    //     // --- order doc ---
-    //     const orderDoc = {
-    //       userEmail: req.body.shipping?.email || null, // from verifyToken
-    //       items: items.map((it) => ({
-    //         productId: new ObjectId(it.productId),
-    //         variantLabel: it.variantLabel ?? null,
-    //         price: Number(it.price) || 0,
-    //         qty: Number(it.qty) || 1,
-    //       })),
-    //       shipping,
-    //       payment,
-    //       amounts: { subtotal, grandTotal },
-    //       status: "pending", // pending | confirmed | shipped | delivered | cancelled
-    //       createdAt: new Date(),
-    //       updatedAt: new Date(),
-    //     };
-
-    //     // --- insert the order first ---
-    //     const orderResult = await orderCollection.insertOne(orderDoc);
-
-    //     // --- increment orderCount on each product (by qty) ---
-    //     const incOps = items.map((it) => ({
-    //       updateOne: {
-    //         filter: { _id: new ObjectId(it.productId) },
-    //         update: { $inc: { orderCount: Number(it.qty) || 0 } }, // creates field if missing
-    //       },
-    //     }));
-    //     if (incOps.length) {
-    //       await productCollection.bulkWrite(incOps, { ordered: false });
-    //     }
-
-    //     // --- OPTIONAL: reduce stock on the specific variant ---
-    //     // If your product doc looks like:
-    //     // { _id, variants: [{ label: "১ কেজি", stock: 10, ... }, ...] }
-    //     // this will subtract qty from the matching variant's stock (never below 0)
-    //     const stockOps = items
-    //       .filter((it) => it.variantLabel)
-    //       .map((it) => ({
-    //         updateOne: {
-    //           filter: { _id: new ObjectId(it.productId) },
-    //           update: {
-    //             $inc: { "variants.$[v].stock": -Math.abs(Number(it.qty) || 0) },
-    //           },
-    //           arrayFilters: [{ "v.label": it.variantLabel }],
-    //         },
-    //       }));
-    //     if (stockOps.length) {
-    //       await productCollection.bulkWrite(stockOps, { ordered: false });
-    //     }
-
-    //     return res.send({
-    //       ok: true,
-    //       orderId: orderResult.insertedId,
-    //       message: "Order placed successfully.",
-    //     });
-    //   } catch (err) {
-    //     console.error("POST /orders error:", err);
-    //     return res.status(500).send({ message: "Failed to place order." });
-    //   }
-    // });
-
     // *****REVIEWS RELATED API'S*******
     app.post("/review", verifyToken, async (req, res) => {
       try {
@@ -765,38 +674,199 @@ async function run() {
     // ********* Admin ANALYTICS*********
     app.get("/admin-stats", verifyToken, verifyAdmin, async (req, res) => {
       try {
-        const totalCamps = await campCollection.countDocuments(); // Total campaigns
-        const totalUsers = await userCollection.countDocuments(); // Total registered users
+        const now = new Date();
 
-        // Total registrations & count of paid/unpaid users
-        const totalRegistrations =
-          await registrationCollection.countDocuments();
-        const paidRegistrations = await registrationCollection.countDocuments({
-          payment_status: "paid",
-        });
-        const unpaidRegistrations = totalRegistrations - paidRegistrations;
+        const start30d = new Date(now);
+        start30d.setDate(start30d.getDate() - 29);
+        start30d.setHours(0, 0, 0, 0);
 
-        // Total revenue
-        const totalRevenueResult = await paymentCollection
+        const start12m = new Date(now);
+        start12m.setMonth(start12m.getMonth() - 11);
+        start12m.setDate(1);
+        start12m.setHours(0, 0, 0, 0);
+
+        // ---------- 1) Totals ----------
+        const [totalOrders, totalUsers, totalProducts] = await Promise.all([
+          orderCollection.countDocuments({}),
+          userCollection.countDocuments({}),
+          productCollection.countDocuments({}),
+        ]);
+
+        const revenueAgg = await orderCollection
           .aggregate([
-            { $group: { _id: null, totalRevenue: { $sum: "$price" } } },
+            {
+              $group: {
+                _id: null,
+                orderCount: { $sum: 1 },
+                totalRevenue: { $sum: { $ifNull: ["$amounts.grandTotal", 0] } },
+              },
+            },
           ])
           .toArray();
-        const totalRevenue =
-          totalRevenueResult.length > 0
-            ? totalRevenueResult[0].totalRevenue
-            : 0;
+
+        const orderCount = revenueAgg[0]?.orderCount || 0;
+        const totalRevenue = revenueAgg[0]?.totalRevenue || 0;
+        const avgOrderValue = orderCount ? totalRevenue / orderCount : 0;
+
+        // ---------- 2) Status breakdown ----------
+        const statusBreakdown = await orderCollection
+          .aggregate([
+            { $group: { _id: { $toLower: "$status" }, count: { $sum: 1 } } },
+            { $project: { _id: 0, status: "$_id", count: 1 } },
+            { $sort: { count: -1 } },
+          ])
+          .toArray();
+
+        // ---------- 3) Sales by DAY (last 30 days) ----------
+        const salesByDay = await orderCollection
+          .aggregate([
+            { $match: { createdAt: { $gte: start30d } } },
+            {
+              $group: {
+                _id: {
+                  y: { $year: "$createdAt" },
+                  m: { $month: "$createdAt" },
+                  d: { $dayOfMonth: "$createdAt" },
+                },
+                orders: { $sum: 1 },
+                revenue: { $sum: { $ifNull: ["$amounts.grandTotal", 0] } },
+              },
+            },
+            {
+              $project: {
+                _id: 0,
+                date: {
+                  $dateFromParts: {
+                    year: "$_id.y",
+                    month: "$_id.m",
+                    day: "$_id.d",
+                  },
+                },
+                orders: 1,
+                revenue: 1,
+              },
+            },
+            { $sort: { date: 1 } },
+          ])
+          .toArray();
+
+        // ---------- 4) Sales by MONTH (last 12 months) ----------
+        const salesByMonth = await orderCollection
+          .aggregate([
+            { $match: { createdAt: { $gte: start12m } } },
+            {
+              $group: {
+                _id: {
+                  y: { $year: "$createdAt" },
+                  m: { $month: "$createdAt" },
+                },
+                orders: { $sum: 1 },
+                revenue: { $sum: { $ifNull: ["$amounts.grandTotal", 0] } },
+              },
+            },
+            {
+              $project: {
+                _id: 0,
+                year: "$_id.y",
+                month: "$_id.m",
+                ym: {
+                  $concat: [
+                    { $toString: "$_id.y" },
+                    "-",
+                    {
+                      $toString: {
+                        $cond: [
+                          { $lt: ["$_id.m", 10] },
+                          { $concat: ["0", { $toString: "$_id.m" }] },
+                          { $toString: "$_id.m" },
+                        ],
+                      },
+                    },
+                  ],
+                },
+                orders: 1,
+                revenue: 1,
+              },
+            },
+            { $sort: { year: 1, month: 1 } },
+          ])
+          .toArray();
+
+        // ---------- 5) Top products ----------
+        const topProducts = await orderCollection
+          .aggregate([
+            { $unwind: "$items" },
+            {
+              $group: {
+                _id: "$items.productId",
+                qty: { $sum: { $ifNull: ["$items.qty", 0] } },
+                revenue: {
+                  $sum: {
+                    $multiply: [
+                      { $ifNull: ["$items.qty", 0] },
+                      { $ifNull: ["$items.price", 0] },
+                    ],
+                  },
+                },
+              },
+            },
+            { $sort: { qty: -1 } },
+            { $limit: 10 },
+            {
+              $lookup: {
+                from: "products",
+                localField: "_id",
+                foreignField: "_id",
+                as: "product",
+              },
+            },
+            { $unwind: { path: "$product", preserveNullAndEmptyArrays: true } },
+            {
+              $project: {
+                _id: 0,
+                productId: "$_id",
+                name: { $ifNull: ["$product.name", "Unknown"] },
+                image: { $ifNull: ["$product.image", null] },
+                category: { $ifNull: ["$product.category", null] },
+                qty: 1,
+                revenue: 1,
+              },
+            },
+          ])
+          .toArray();
+
+        // ---------- 6) Top customers ----------
+        const topCustomers = await orderCollection
+          .aggregate([
+            {
+              $group: {
+                _id: { $ifNull: ["$userEmail", "unknown@unknown"] },
+                orders: { $sum: 1 },
+                revenue: { $sum: { $ifNull: ["$amounts.grandTotal", 0] } },
+              },
+            },
+            { $sort: { revenue: -1 } },
+            { $limit: 10 },
+          ])
+          .toArray();
 
         res.json({
-          totalCamps,
-          totalUsers,
-          totalRegistrations,
-          paidRegistrations,
-          unpaidRegistrations,
-          totalRevenue,
+          totals: {
+            totalOrders,
+            totalUsers,
+            totalProducts,
+            totalRevenue,
+            avgOrderValue,
+          },
+          statusBreakdown,
+          salesByDay,
+          salesByMonth,
+          topProducts,
+          topCustomers,
+          generatedAt: new Date(),
         });
       } catch (error) {
-        console.error("Error fetching admin stats:", error);
+        console.error("Error /admin-stats:", error);
         res.status(500).json({ error: "Internal Server Error" });
       }
     });
