@@ -52,6 +52,7 @@ async function run() {
     const userCollection = db.collection("users");
     // const campCollection = db.collection("campaigns");
     const productCollection = db.collection("products");
+    const orderCollection = db.collection("orders");
     const registrationCollection = db.collection("registrations");
     const paymentCollection = db.collection("payments");
     const reviewCollection = db.collection("reviews");
@@ -105,6 +106,98 @@ async function run() {
       const data = req.body;
       const result = await productCollection.insertOne(data);
       res.send(result);
+    });
+
+    // POST /orders
+    // Body shape:
+    // {
+    //   items: [
+    //     { productId: "66b11...abc", variantLabel: "১ কেজি", price: 140, qty: 2 },
+    //     { productId: "66b22...def", variantLabel: "500g",  price: 210, qty: 1 }
+    //   ],
+    //   shipping: { name, phone, address, note },   // whatever you collect
+    //   payment:  { method: "COD" }                 // optional
+    // }
+    app.post("/orders", verifyToken, async (req, res) => {
+      try {
+        const { items, shipping = {}, payment = {} } = req.body;
+
+        // --- basic validations ---
+        if (!Array.isArray(items) || items.length === 0) {
+          return res.status(400).send({ message: "No items provided." });
+        }
+        for (const it of items) {
+          if (!it.productId || !ObjectId.isValid(it.productId) || !it.qty) {
+            return res.status(400).send({ message: "Invalid item payload." });
+          }
+        }
+
+        // --- compute totals (server-side safety) ---
+        const subtotal = items.reduce(
+          (s, it) => s + Number(it.price || 0) * Number(it.qty || 0),
+          0
+        );
+        const grandTotal = subtotal; // add delivery charge/discount here if you have
+
+        // --- order doc ---
+        const orderDoc = {
+          userEmail: req.body.shipping?.email || null, // from verifyToken
+          items: items.map((it) => ({
+            productId: new ObjectId(it.productId),
+            variantLabel: it.variantLabel ?? null,
+            price: Number(it.price) || 0,
+            qty: Number(it.qty) || 1,
+          })),
+          shipping,
+          payment,
+          amounts: { subtotal, grandTotal },
+          status: "pending", // pending | confirmed | shipped | delivered | cancelled
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        // --- insert the order first ---
+        const orderResult = await orderCollection.insertOne(orderDoc);
+
+        // --- increment orderCount on each product (by qty) ---
+        const incOps = items.map((it) => ({
+          updateOne: {
+            filter: { _id: new ObjectId(it.productId) },
+            update: { $inc: { orderCount: Number(it.qty) || 0 } }, // creates field if missing
+          },
+        }));
+        if (incOps.length) {
+          await productCollection.bulkWrite(incOps, { ordered: false });
+        }
+
+        // --- OPTIONAL: reduce stock on the specific variant ---
+        // If your product doc looks like:
+        // { _id, variants: [{ label: "১ কেজি", stock: 10, ... }, ...] }
+        // this will subtract qty from the matching variant's stock (never below 0)
+        const stockOps = items
+          .filter((it) => it.variantLabel)
+          .map((it) => ({
+            updateOne: {
+              filter: { _id: new ObjectId(it.productId) },
+              update: {
+                $inc: { "variants.$[v].stock": -Math.abs(Number(it.qty) || 0) },
+              },
+              arrayFilters: [{ "v.label": it.variantLabel }],
+            },
+          }));
+        if (stockOps.length) {
+          await productCollection.bulkWrite(stockOps, { ordered: false });
+        }
+
+        return res.send({
+          ok: true,
+          orderId: orderResult.insertedId,
+          message: "Order placed successfully.",
+        });
+      } catch (err) {
+        console.error("POST /orders error:", err);
+        return res.status(500).send({ message: "Failed to place order." });
+      }
     });
 
     // save registration data in registrationCollection and increase count on campCollection
@@ -400,6 +493,51 @@ async function run() {
       }
     });
 
+    //  ********ORDERS RELATED API*********
+
+    // GET /orders/my/:email
+    app.get("/orders/my/:email", verifyToken, async (req, res) => {
+      try {
+        const email = req.params.email?.toLowerCase();
+        // const tokenEmail = req.user?.email?.toLowerCase();
+        if (!email) return res.status(400).send({ message: "Email required" });
+
+        // // enforce that callers can only read their own orders
+        // if (email !== tokenEmail) {
+        //   return res.status(403).send({ message: "Forbidden" });
+        // }
+
+        // pagination
+        const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+        const limit = Math.min(
+          Math.max(parseInt(req.query.limit, 10) || 10, 1),
+          100
+        );
+        const skip = (page - 1) * limit;
+
+        const match = { userEmail: email }; // or { userEmail: email } based on your doc
+        const total = await orderCollection.countDocuments(match);
+
+        const items = await orderCollection
+          .find(match)
+          .sort({ _id: -1 }) // newest first
+          .skip(skip)
+          .limit(limit)
+          .toArray();
+
+        res.send({
+          total,
+          page,
+          limit,
+          pages: Math.ceil(total / limit),
+          items,
+        });
+      } catch (err) {
+        console.error("GET /orders/my/:email failed:", err);
+        res.status(500).send({ message: "Failed to fetch orders" });
+      }
+    });
+
     // get popular camps for homepage
     app.get("/camps/popular", async (req, res) => {
       const sort = {
@@ -415,54 +553,6 @@ async function run() {
       const query = { _id: new ObjectId(id) };
       const result = await campCollection.findOne(query);
       res.send(result);
-    });
-
-    // SEARCH SORT
-    // Route to fetch available camps with pagination, search, and sorting
-    app.get("/available-camps", async (req, res) => {
-      const sort = req.query.sort;
-      const search = req.query.search;
-      const page = parseInt(req.query.page) || 1; // Default to page 1
-      const limit = parseInt(req.query.limit) || 6; // Default to 6 items per page
-      const skip = (page - 1) * limit; // Calculate documents to skip
-
-      let sortOptions = {};
-      // if (sort === "count") {
-      //   sortOptions = { count: -1 }; // Sort by most participants
-      // } else
-      if (sort === "des") {
-        sortOptions = { price: -1 }; // Sort by price (high to low)
-      } else if (sort === "asc") {
-        sortOptions = { price: 1 }; // Sort by price (low to high)
-      }
-
-      let query = {};
-      if (search) {
-        query = {
-          $or: [
-            { campName: { $regex: search, $options: "i" } },
-            { professionalName: { $regex: search, $options: "i" } },
-            { location: { $regex: search, $options: "i" } },
-            { description: { $regex: search, $options: "i" } },
-            { date: { $regex: search, $options: "i" } },
-          ],
-        };
-      }
-
-      // Count total matching documents
-      const total = await campCollection.countDocuments(query);
-
-      // Fetch paginated results
-      const camps = await campCollection
-        .find(query)
-        .sort(sortOptions)
-        .skip(skip)
-
-        .limit(limit)
-        .toArray();
-
-      // Send response with camps and total count
-      res.send({ camps, total });
     });
 
     //  ********Registration RELATED API*********
