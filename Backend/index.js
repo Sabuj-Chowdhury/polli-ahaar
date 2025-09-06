@@ -539,7 +539,7 @@ async function run() {
     });
 
     // get a single order by id
-    app.get("/orders/:id", async (req, res) => {
+    app.get("/orders/:id", verifyToken, async (req, res) => {
       try {
         const id = req.params.id;
 
