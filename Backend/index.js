@@ -538,22 +538,45 @@ async function run() {
       }
     });
 
-    // get popular camps for homepage
-    app.get("/camps/popular", async (req, res) => {
-      const sort = {
-        count: -1, // for highest participation count
-      };
-      const result = await campCollection.find().sort(sort).limit(6).toArray();
-      res.send(result);
+    // get a single order by id
+    app.get("/orders/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+
+        if (!ObjectId.isValid(id)) {
+          return res.status(400).send({ message: "Invalid order ID" });
+        }
+
+        const query = { _id: new ObjectId(id) };
+        const result = await orderCollection.findOne(query);
+
+        if (!result) {
+          return res.status(404).send({ message: "Order not found" });
+        }
+
+        res.send(result);
+      } catch (err) {
+        console.error("Error fetching order:", err);
+        res.status(500).send({ message: "Server error while fetching order" });
+      }
     });
 
+    // // get popular camps for homepage
+    // app.get("/camps/popular", async (req, res) => {
+    //   const sort = {
+    //     count: -1, // for highest participation count
+    //   };
+    //   const result = await campCollection.find().sort(sort).limit(6).toArray();
+    //   res.send(result);
+    // });
+
     // get camp details by id
-    app.get("/camp/:id", async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await campCollection.findOne(query);
-      res.send(result);
-    });
+    // app.get("/camp/:id", async (req, res) => {
+    //   const id = req.params.id;
+    //   const query = { _id: new ObjectId(id) };
+    //   const result = await campCollection.findOne(query);
+    //   res.send(result);
+    // });
 
     //  ********Registration RELATED API*********
 
