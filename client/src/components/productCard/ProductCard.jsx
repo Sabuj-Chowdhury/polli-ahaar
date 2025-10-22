@@ -1,13 +1,12 @@
-// src/components/products/ProductCard.jsx
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { FiShoppingCart, FiCheck, FiShoppingBag } from "react-icons/fi"; // 👈 added
+import { FiShoppingCart, FiCheck, FiShoppingBag } from "react-icons/fi";
 import useCart from "../../hooks/useCart";
 
 export const ProductCard = ({ p }) => {
   const { addItem } = useCart();
 
-  // --- prices ---
+  // prices
   const minPrice =
     typeof p.minPrice === "number"
       ? p.minPrice
@@ -17,18 +16,16 @@ export const ProductCard = ({ p }) => {
             .filter((n) => Number.isFinite(n))
         );
 
-  // --- stock ---
+  // stock
   const totalStock = (p?.variants || []).reduce(
     (sum, v) => sum + (Number(v?.stock) || 0),
     0
   );
   const outOfStock = totalStock <= 0;
 
-  // --- default variant for add to cart ---
   const defaultVariant =
     (p?.variants || []).find((v) => Number(v?.stock) > 0) || null;
 
-  // --- single-variant badge text ---
   const one =
     Array.isArray(p?.variants) && p.variants.length === 1
       ? p.variants[0]
@@ -39,13 +36,20 @@ export const ProductCard = ({ p }) => {
     one?.title?.toString().trim() ||
     (one?.qty && one?.unit ? `${one.qty} ${one.unit}` : null);
 
-  // --- order count (for badge) ---
   const orderCount = Number(p?.orderCount) || 0;
   const orderCountBn = orderCount.toLocaleString("bn-BD");
 
-  // --- button micro-states ---
+  // micro states
   const [isAdding, setIsAdding] = useState(false);
   const [added, setAdded] = useState(false);
+
+  // disable hover animations on touch devices
+  const [canHover, setCanHover] = useState(true);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setCanHover(window.matchMedia("(hover: hover)").matches);
+    }
+  }, []);
 
   const handleAddToCart = async () => {
     if (outOfStock || !defaultVariant || isAdding) return;
@@ -62,47 +66,47 @@ export const ProductCard = ({ p }) => {
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -4 }}
+      whileHover={canHover ? { y: -4 } : undefined}
       transition={{ type: "spring", stiffness: 220, damping: 20, mass: 0.6 }}
-      className="group h-[380px] rounded-2xl border border-green-200 bg-white shadow-sm overflow-hidden hover:shadow-md transition relative flex flex-col"
+      className="group rounded-xl border border-green-200 bg-white shadow-sm overflow-hidden transition relative flex flex-col"
     >
-      {/* Image */}
-      <div className="aspect-[4/3] bg-gray-50 overflow-hidden relative">
+      {/* Image (square looks best on mobile cards) */}
+      <div className="aspect-square bg-gray-50 overflow-hidden relative">
         <motion.img
           src={p.image}
           alt={p.name}
           referrerPolicy="no-referrer"
           className="h-full w-full object-cover"
-          whileHover={{ scale: 1.04 }}
+          whileHover={canHover ? { scale: 1.04 } : undefined}
           transition={{ type: "spring", stiffness: 180, damping: 16 }}
         />
 
-        {/* Stock / Featured (top-left) */}
+        {/* Stock / Featured */}
         {outOfStock ? (
-          <span className="absolute left-2 top-2 rounded-full bg-red-100 text-red-700 text-[11px] px-2 py-0.5">
+          <span className="absolute left-2 top-2 rounded-full bg-red-100 text-red-700 text-[10px] px-2 py-0.5">
             স্টক নেই
           </span>
         ) : (
           p.featured && (
-            <span className="absolute left-2 top-2 rounded-full bg-amber-100 text-amber-700 text-[11px] px-2 py-0.5">
+            <span className="absolute left-2 top-2 rounded-full bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5">
               Featured
             </span>
           )
         )}
 
-        {/* Single-variant label badge (top-right) */}
+        {/* Single variant */}
         {singleVariantLabel && (
-          <span className="absolute right-2 top-2 rounded-full bg-emerald-600 text-white text-[11px] font-medium px-2.5 py-0.5 shadow-sm">
+          <span className="absolute right-2 top-2 rounded-full bg-emerald-600 text-white text-[10px] font-medium px-2 py-0.5 shadow-sm">
             {singleVariantLabel}
           </span>
         )}
 
-        {/* 👇 Order count badge (bottom-left) */}
+        {/* Order count – always visible */}
         {orderCount > 0 && (
           <span
-            className="absolute left-2 bottom-2 inline-flex items-center gap-1.5 rounded-full border border-green-200 bg-white/95 backdrop-blur px-2.5 py-1 text-[11px] text-green-700 shadow-sm"
+            className="absolute left-2 bottom-2 inline-flex items-center gap-1.5 rounded-full border border-green-200 bg-white/95 backdrop-blur px-2 py-0.5 text-[10px] text-green-700 shadow-sm"
             title={`${orderCountBn} বার অর্ডার হয়েছে`}
             aria-label={`${orderCountBn} বার অর্ডার হয়েছে`}
           >
@@ -113,14 +117,14 @@ export const ProductCard = ({ p }) => {
       </div>
 
       {/* Body */}
-      <div className="flex flex-col flex-1 p-4">
+      <div className="flex flex-col flex-1 p-3 sm:p-4">
         <div>
-          <h3 className="hind-siliguri-medium text-gray-900 line-clamp-2 leading-snug">
+          <h3 className="hind-siliguri-medium text-gray-900 leading-snug text-[15px] sm:text-base line-clamp-1 sm:line-clamp-2">
             {p.name}
           </h3>
 
           {p.brand && (
-            <div className="text-xs text-gray-500 mt-0.5 line-clamp-1">
+            <div className="text-[11px] sm:text-xs text-gray-500 mt-0.5 line-clamp-1">
               {p.brand}
             </div>
           )}
@@ -128,20 +132,19 @@ export const ProductCard = ({ p }) => {
 
         {/* Price */}
         <div className="mt-2 flex items-center justify-between">
-          <div className="text-lg text-green-700">
+          <div className="text-[15px] sm:text-lg text-green-700">
             {Number.isFinite(minPrice) ? `৳ ${minPrice}` : "দাম দেখুন"}
           </div>
-          <div className="text-[11px] text-gray-500 invisible">•</div>
+          <div className="text-[10px] text-gray-500 invisible">•</div>
         </div>
 
-        {/* Spacer */}
         <div className="flex-1" />
 
         {/* Cart Button */}
         <motion.button
           type="button"
           onClick={handleAddToCart}
-          whileHover={!outOfStock ? { y: -1 } : undefined}
+          whileHover={!outOfStock && canHover ? { y: -1 } : undefined}
           whileTap={!outOfStock ? { scale: 0.98 } : undefined}
           disabled={outOfStock || isAdding}
           aria-disabled={outOfStock || isAdding}
@@ -151,7 +154,7 @@ export const ProductCard = ({ p }) => {
           title={
             outOfStock ? "স্টক নেই" : added ? "যোগ হয়েছে" : "কার্টে যোগ করুন"
           }
-          className={`relative mt-3 w-full overflow-hidden rounded-2xl px-4 py-2.5
+          className={`relative mt-3 w-full overflow-hidden rounded-xl sm:rounded-2xl px-3 sm:px-4 py-2 sm:py-2.5
             transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2
             ${
               outOfStock || isAdding
@@ -159,7 +162,7 @@ export const ProductCard = ({ p }) => {
                 : "bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-sm hover:shadow-md"
             }`}
         >
-          {!outOfStock && !isAdding && (
+          {!outOfStock && !isAdding && canHover && (
             <motion.span className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100">
               <motion.span
                 className="absolute -left-1/3 top-0 h-full w-1/3 bg-white/10 blur-md"
@@ -200,7 +203,7 @@ export const ProductCard = ({ p }) => {
               )}
             </AnimatePresence>
 
-            <span className="hind-siliguri-medium text-sm">
+            <span className="hind-siliguri-medium text-[13px] sm:text-sm">
               {outOfStock
                 ? "স্টক নেই"
                 : added
@@ -209,7 +212,6 @@ export const ProductCard = ({ p }) => {
             </span>
           </div>
 
-          {/* Loading overlay */}
           <AnimatePresence>
             {isAdding && (
               <motion.span

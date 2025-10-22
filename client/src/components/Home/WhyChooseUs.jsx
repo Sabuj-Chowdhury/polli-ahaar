@@ -63,7 +63,7 @@ const WhyChooseUs = () => {
           className="text-center max-w-2xl mx-auto"
         >
           <h2 className="noto-serif-bengali-normal text-2xl sm:text-3xl text-brand-neutral-900">
-            কেন আমাদের বেছে নেবেন?
+            কেন আমাদের বেছে নিবেন?
           </h2>
           <p className="hind-siliguri-regular mt-3 text-brand-neutral-600 leading-7">
             আমরা প্রতিশ্রুতি দিই খাঁটি, নিরাপদ ও ন্যায্য দামের গ্রামীণ

@@ -113,7 +113,7 @@ const AllProducts = () => {
                 }
                 onKeyDown={onEnterApply}
                 className="w-full rounded-xl border border-gray-300 pl-9 pr-3 py-2 outline-none focus:border-green-600"
-                placeholder="পণ্য/টাইপ/ব্র্যান্ড খুঁজুন…"
+                placeholder="পণ্য/টাইপ/ব্র্যান্ড খুঁজুন"
               />
             </div>
           </div>

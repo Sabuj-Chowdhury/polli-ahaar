@@ -1,6 +1,6 @@
 import { MotionConfig, motion } from "framer-motion";
 import { Link } from "react-router"; // client-side navigation
-import heroImage from "../../assets/HeroImg.png";
+import heroImage from "../../assets/hero2.png";
 import { FaMoneyBillWave, FaRotate } from "react-icons/fa6";
 
 const container = {
@@ -77,15 +77,15 @@ export const Hero = () => (
               এখনই কিনুন
             </Link>
           </motion.div>
-          <TrustItem icon={<FaMoneyBillWave />} text="ক্যাশ অন ডেলিভারি" />
-          <TrustItem icon={<FaRotate />} text="৭ দিনের রিটার্ন" />
+          {/* <TrustItem icon={<FaMoneyBillWave />} text="ক্যাশ অন ডেলিভারি" />
+          <TrustItem icon={<FaRotate />} text="৭ দিনের রিটার্ন" /> */}
         </motion.div>
 
         {/* Trust chips */}
-        {/* <motion.div variants={item} className="mt-4 flex flex-wrap gap-2">
+        <motion.div variants={item} className="mt-4 flex flex-wrap gap-2">
           <TrustItem icon={<FaMoneyBillWave />} text="ক্যাশ অন ডেলিভারি" />
           <TrustItem icon={<FaRotate />} text="৭ দিনের রিটার্ন" />
-        </motion.div> */}
+        </motion.div>
       </motion.div>
 
       {/* Right: image */}
@@ -93,7 +93,7 @@ export const Hero = () => (
         <motion.img
           src={heroImage}
           alt="Polli Ahaar"
-          className="w-full h-[340px] md:h-[420px] object-cover rounded-3xl"
+          className="w-full h-[340px] md:h-[420px] object-contain md:object-cover rounded-3xl"
           initial={{ scale: 1.03, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.6 }}
